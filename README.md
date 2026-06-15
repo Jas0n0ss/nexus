@@ -212,55 +212,6 @@ CI 将自动：
 
 ---
 
-## 项目结构
-
-```
-nexus-vpn/
-├── .github/
-│   └── workflows/
-│       ├── release.yml        # 多平台 Release CI（tag 触发）
-│       ├── build-check.yml    # PR 构建验证
-│       └── ci.yml             # 协议 / 解析器 / 自动修复单测
-├── app/                       # Flutter 应用主目录
-│   ├── lib/
-│   │   ├── main.dart          # 入口
-│   │   ├── app.dart           # 主题 / 路由
-│   │   ├── models/            # 数据模型（ProxyNode 等）
-│   │   ├── providers/         # 状态管理（VPN / Nodes / Settings / Logs）
-│   │   ├── screens/           # 5 个页面（仪表盘 / 节点 / 导入 / 日志 / 设置）
-│   │   ├── widgets/           # 共享组件（GlassCard / ConnectButton）
-│   │   └── core/              # 核心逻辑（NodeParser / SingboxRunner / AutofixEngine / ConfigGenerator）
-│   ├── ios/
-│   │   └── NexusVPNExtension/ # NEPacketTunnelProvider（iOS / macOS Network Extension）
-│   ├── android/
-│   │   └── app/src/main/kotlin/com/nexusvpn/
-│   │       └── VpnService.kt  # Android VpnService + TUN
-│   ├── windows/
-│   │   ├── runner/
-│   │   │   └── vpn_channel.cpp # WinTUN + 系统代理 Platform Channel
-│   │   └── installer/
-│   │       └── nexus-vpn.iss  # Inno Setup 安装包脚本
-│   ├── assets/
-│   │   ├── cores/             # sing-box 二进制（构建时下载）
-│   │   ├── icons/             # 应用图标
-│   │   └── fonts/             # Inter 字体
-│   ├── pubspec.yaml           # Flutter 依赖声明
-│   └── BUILD.md               # 详细构建指南
-├── src/                       # TypeScript 工具库（Node.js / Electron 可复用）
-│   ├── parsers/
-│   │   └── node_parser.ts     # URI / 订阅 / sing-box JSON 解析器
-│   └── core/
-│       ├── singbox_generator.ts # sing-box 配置生成器
-│       └── health_monitor.ts    # 运行时健康监控
-├── architecture.svg           # 跨平台架构图
-├── nexus-vpn-preview.html     # 可交互 Web UI 预览
-└── README.md                  # 本文档
-```
-
-完整注解版目录见 [STRUCTURE.md](STRUCTURE.md)。
-
----
-
 ## 配置示例
 
 ### sing-box 生成配置（VLESS + REALITY）
@@ -310,20 +261,6 @@ nexus-vpn/
 
 ---
 
-## 贡献
-
-欢迎 PR 和 Issue！
-
-```bash
-# Fork → Clone → 创建分支
-git checkout -b feat/my-feature
-
-# 开发 → 提交
-git commit -m "feat: add XXX support"
-
-# 推送 → 创建 PR 到 develop 分支
-git push origin feat/my-feature
-```
 
 ### 添加新协议支持
 
@@ -337,14 +274,6 @@ git push origin feat/my-feature
 
 ## 许可证
 
-[MIT License](LICENSE) · Copyright © 2025 Nexus VPN Team
+[MIT License](LICENSE)
 
 ---
-
-<div align="center">
-
-**⭐ 如果这个项目对你有帮助，请给个 Star！**
-
-[报告问题](https://github.com/yourorg/nexus-vpn/issues) · [功能请求](https://github.com/yourorg/nexus-vpn/issues) · [讨论](https://github.com/yourorg/nexus-vpn/discussions)
-
-</div>
