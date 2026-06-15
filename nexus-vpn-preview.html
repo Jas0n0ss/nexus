@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nexus VPN — Modern VPN Client Preview</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  /* ─── Reset & Base ─── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:        #0f0f13;
+    --surface:   rgba(255,255,255,0.06);
+    --surface2:  rgba(255,255,255,0.10);
+    --glass:     rgba(255,255,255,0.08);
+    --border:    rgba(255,255,255,0.12);
+    --accent:    #3b82f6;
+    --accent2:   #6366f1;
+    --green:     #22c55e;
+    --red:       #ef4444;
+    --yellow:    #f59e0b;
+    --text:      #f0f0f5;
+    --text2:     rgba(240,240,245,0.55);
+    --text3:     rgba(240,240,245,0.30);
+    --radius:    16px;
+    --radius-sm: 10px;
+    --shadow:    0 8px 32px rgba(0,0,0,0.5);
+    --font:      -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', sans-serif;
+  }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); -webkit-font-smoothing: antialiased; overflow: hidden; }
+
+  /* ─── Layout ─── */
+  .app { display: flex; height: 100vh; width: 100vw; }
+  .sidebar { width: 220px; flex-shrink: 0; background: rgba(10,10,18,0.9); backdrop-filter: blur(20px); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px 12px; gap: 4px; }
+  .main { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* ─── Sidebar ─── */
+  .logo { display: flex; align-items: center; gap: 10px; padding: 8px 12px 20px; }
+  .logo-icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, var(--accent), var(--accent2)); display: flex; align-items: center; justify-content: center; font-size: 16px; }
+  .logo-name { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; color: var(--text2); cursor: pointer; transition: all 0.15s; user-select: none; }
+  .nav-item:hover { background: var(--surface); color: var(--text); }
+  .nav-item.active { background: var(--surface2); color: var(--text); }
+  .nav-item svg { opacity: 0.7; flex-shrink: 0; }
+  .nav-item.active svg { opacity: 1; }
+  .nav-section { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 12px 6px; }
+  .sidebar-spacer { flex: 1; }
+  .sidebar-version { font-size: 11px; color: var(--text3); padding: 8px 12px; }
+
+  /* ─── Tab content ─── */
+  .tab-panel { display: none; flex: 1; overflow-y: auto; padding: 28px 32px; animation: fadeIn 0.2s ease; }
+  .tab-panel.active { display: block; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ─── Page header ─── */
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .page-title { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+  .page-subtitle { font-size: 13px; color: var(--text2); margin-top: 2px; }
+
+  /* ─── Cards ─── */
+  .card { background: var(--glass); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; }
+  .card-sm { padding: 16px 20px; }
+
+  /* ─── Connection Card ─── */
+  .connect-card { position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(99,102,241,0.10)); border-color: rgba(99,102,241,0.25); margin-bottom: 20px; }
+  .connect-card::before { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; background: radial-gradient(circle, rgba(99,102,241,0.2), transparent 70%); pointer-events: none; }
+  .connect-grid { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; }
+  .connect-status { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .status-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  .status-dot.off { background: var(--text3); box-shadow: none; animation: none; }
+  @keyframes pulse { 0%,100% { box-shadow: 0 0 6px var(--green); } 50% { box-shadow: 0 0 14px var(--green); } }
+  .connect-label { font-size: 13px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; }
+  .connect-ip { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  .connect-meta { font-size: 13px; color: var(--text2); margin-top: 4px; }
+  .connect-meta span { color: var(--accent); font-weight: 600; }
+
+  /* ─── Toggle Button ─── */
+  .toggle-btn { width: 80px; height: 80px; border-radius: 50%; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1); position: relative; overflow: hidden; }
+  .toggle-btn.on { background: linear-gradient(135deg, var(--green) 0%, #16a34a 100%); color: white; box-shadow: 0 0 24px rgba(34,197,94,0.4); }
+  .toggle-btn.off { background: var(--surface2); color: var(--text2); box-shadow: none; }
+  .toggle-btn:hover { transform: scale(1.06); }
+  .toggle-btn:active { transform: scale(0.96); }
+  .toggle-icon { font-size: 22px; }
+
+  /* ─── Stats row ─── */
+  .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat-card { background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px; text-align: center; }
+  .stat-label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+  .stat-value { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+  .stat-value.up { color: var(--green); }
+  .stat-value.down { color: var(--accent); }
+  .stat-unit { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+  /* ─── Chart ─── */
+  .chart-card { margin-bottom: 20px; }
+  .chart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+  .chart-title { font-size: 15px; font-weight: 600; }
+  .chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--text2); }
+  .legend-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+  .chart-wrap { position: relative; height: 140px; }
+
+  /* ─── Node List ─── */
+  .node-toolbar { display: flex; gap: 10px; margin-bottom: 16px; }
+  .search-box { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 14px 9px 38px; font-size: 14px; color: var(--text); outline: none; position: relative; }
+  .search-wrap { position: relative; flex: 1; }
+  .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); opacity: 0.4; }
+  .search-box::placeholder { color: var(--text3); }
+  .search-box:focus { border-color: var(--accent); background: rgba(59,130,246,0.08); }
+  .btn { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 9px 16px; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+  .btn:hover { background: var(--surface); border-color: rgba(255,255,255,0.2); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  .btn.primary:hover { background: #2563eb; }
+
+  .node-groups { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .group-chip { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; border: 1px solid var(--border); color: var(--text2); background: transparent; }
+  .group-chip.active { background: var(--accent); border-color: var(--accent); color: white; }
+  .group-chip:hover:not(.active) { background: var(--surface); color: var(--text); }
+
+  .node-list { display: flex; flex-direction: column; gap: 8px; }
+  .node-item { display: flex; align-items: center; gap: 14px; background: var(--glass); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; cursor: pointer; transition: all 0.15s; }
+  .node-item:hover { background: var(--surface2); border-color: rgba(255,255,255,0.18); }
+  .node-item.selected { background: rgba(59,130,246,0.12); border-color: rgba(59,130,246,0.4); }
+  .node-flag { font-size: 22px; width: 32px; text-align: center; }
+  .node-info { flex: 1; min-width: 0; }
+  .node-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .node-detail { font-size: 12px; color: var(--text2); margin-top: 2px; display: flex; gap: 10px; align-items: center; }
+  .proto-badge { background: rgba(99,102,241,0.2); color: #a5b4fc; padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+  .node-latency { font-size: 13px; font-weight: 700; min-width: 48px; text-align: right; }
+  .lat-good { color: var(--green); }
+  .lat-mid  { color: var(--yellow); }
+  .lat-bad  { color: var(--red); }
+  .lat-na   { color: var(--text3); }
+  .node-actions { display: flex; gap: 6px; }
+  .icon-btn { background: transparent; border: none; color: var(--text3); cursor: pointer; padding: 4px; border-radius: 6px; transition: all 0.15s; font-size: 14px; }
+  .icon-btn:hover { background: var(--surface2); color: var(--text); }
+  .speed-badge { font-size: 11px; color: var(--text3); min-width: 56px; text-align: right; }
+
+  /* ─── Import Panel ─── */
+  .import-modes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  .import-mode-btn { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 16px 12px; text-align: center; cursor: pointer; transition: all 0.15s; }
+  .import-mode-btn.active { background: rgba(59,130,246,0.12); border-color: var(--accent); }
+  .import-mode-btn:hover:not(.active) { background: var(--surface2); }
+  .import-mode-icon { font-size: 24px; margin-bottom: 6px; }
+  .import-mode-label { font-size: 12px; font-weight: 600; color: var(--text2); }
+  .import-mode-btn.active .import-mode-label { color: var(--accent); }
+
+  .import-area { background: var(--surface); border: 2px dashed var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+  .import-area textarea { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; resize: none; min-height: 100px; }
+  .import-area textarea::placeholder { color: var(--text3); }
+
+  .import-result { display: none; background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 16px; }
+  .import-result.error { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); }
+  .import-result.visible { display: block; }
+  .autofix-tag { display: inline-flex; align-items: center; gap: 5px; background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); border-radius: 6px; padding: 3px 9px; font-size: 11px; font-weight: 600; color: #fbbf24; margin-top: 8px; }
+
+  /* ─── Protocol Badges (import list) ─── */
+  .parsed-node-list { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+  .parsed-node { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; }
+  .parsed-ok { color: var(--green); font-size: 16px; }
+  .parsed-warn { color: var(--yellow); font-size: 16px; }
+
+  /* ─── Logs ─── */
+  .log-toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; }
+  .log-filter { display: flex; gap: 4px; }
+  .log-filter-btn { padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); background: transparent; color: var(--text3); cursor: pointer; transition: all 0.15s; }
+  .log-filter-btn.active { background: var(--surface2); color: var(--text); }
+  .log-area { background: rgba(0,0,0,0.4); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 12px; height: 420px; overflow-y: auto; }
+  .log-line { display: flex; gap: 12px; padding: 2px 0; line-height: 1.6; }
+  .log-time { color: var(--text3); min-width: 80px; }
+  .log-level { min-width: 48px; font-weight: 700; }
+  .log-level.info  { color: var(--accent); }
+  .log-level.warn  { color: var(--yellow); }
+  .log-level.error { color: var(--red); }
+  .log-level.ok    { color: var(--green); }
+  .log-msg { color: var(--text2); }
+  .log-msg .hl { color: var(--text); }
+
+  /* ─── Settings ─── */
+  .settings-section { margin-bottom: 28px; }
+  .settings-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 12px; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-info { flex: 1; }
+  .setting-name { font-size: 14px; font-weight: 500; }
+  .setting-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .toggle-switch { width: 44px; height: 26px; background: var(--surface2); border-radius: 13px; position: relative; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+  .toggle-switch.on { background: var(--green); }
+  .toggle-switch::after { content: ''; position: absolute; width: 20px; height: 20px; background: white; border-radius: 50%; top: 3px; left: 3px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+  .toggle-switch.on::after { left: 21px; }
+  .select-input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; color: var(--text); outline: none; cursor: pointer; }
+
+  /* ─── Modal ─── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: all 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: rgba(18,18,28,0.95); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 440px; max-width: 90vw; box-shadow: var(--shadow); transform: scale(0.95); transition: transform 0.2s; }
+  .modal-overlay.open .modal { transform: scale(1); }
+  .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+  .modal-row { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
+
+  /* ─── Notification toast ─── */
+  .toast { position: fixed; bottom: 28px; right: 28px; background: rgba(22,22,32,0.95); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 10px; min-width: 260px; box-shadow: var(--shadow); transform: translateY(80px); opacity: 0; transition: all 0.35s cubic-bezier(0.34,1.56,0.64,1); z-index: 200; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast-icon { font-size: 16px; }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+
+  /* ─── Connecting animation ─── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-top-color: white; border-radius: 50%; animation: spin 0.8s linear infinite; }
+
+  /* ─── Progress bar ─── */
+  .progress-bar { height: 3px; background: var(--surface2); border-radius: 2px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 2px; transition: width 0.3s; }
+
+  /* ─── Latency test animation ─── */
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+  .testing { animation: blink 1s infinite; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ─── Sidebar ─── -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🌐</div>
+      <div class="logo-name">Nexus VPN</div>
+    </div>
+
+    <span class="nav-section">主菜单</span>
+    <div class="nav-item active" onclick="switchTab('dashboard')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/><path d="M2 12h20"/></svg>
+      仪表盘
+    </div>
+    <div class="nav-item" onclick="switchTab('nodes')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      节点列表
+    </div>
+    <div class="nav-item" onclick="switchTab('import')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      导入配置
+    </div>
+    <div class="nav-item" onclick="switchTab('logs')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+      运行日志
+    </div>
+    <div class="nav-item" onclick="switchTab('settings')">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"/></svg>
+      设置
+    </div>
+
+    <div class="sidebar-spacer"></div>
+    <div class="sidebar-version">Nexus VPN v1.0.0-preview</div>
+  </aside>
+
+  <!-- ─── Main area ─── -->
+  <main class="main">
+
+    <!-- ══════════════ DASHBOARD ══════════════ -->
+    <div class="tab-panel active" id="tab-dashboard">
+      <div class="page-header">
+        <div>
+          <div class="page-title">仪表盘</div>
+          <div class="page-subtitle">实时连接状态与流量监控</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="runSpeedTest()">🚀 测速</button>
+          <button class="btn primary" onclick="openImportModal()">＋ 添加节点</button>
+        </div>
+      </div>
+
+      <!-- Connection Card -->
+      <div class="card connect-card">
+        <div class="connect-grid">
+          <div>
+            <div class="connect-status">
+              <div class="status-dot" id="statusDot"></div>
+              <div class="connect-label" id="statusLabel">已连接</div>
+            </div>
+            <div class="connect-ip" id="connectIp">103.218.64.X</div>
+            <div class="connect-meta" id="connectMeta">通过 <span id="connectNode">🇯🇵 日本 Tokyo 01</span> · VLESS + REALITY · sing-box 1.9.x</div>
+            <div style="margin-top:12px">
+              <div style="font-size:12px;color:var(--text3);margin-bottom:4px">连接时长</div>
+              <div style="font-size:16px;font-weight:600" id="uptime">01:24:37</div>
+            </div>
+          </div>
+          <button class="toggle-btn on" id="toggleBtn" onclick="toggleConnection()">
+            <div class="toggle-icon">⏻</div>
+            <div id="toggleLabel">断开</div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Stats Row -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-label">↑ 上传速度</div>
+          <div class="stat-value up" id="upSpeed">3.2</div>
+          <div class="stat-unit">MB/s</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">↓ 下载速度</div>
+          <div class="stat-value down" id="downSpeed">18.7</div>
+          <div class="stat-unit">MB/s</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">📶 延迟</div>
+          <div class="stat-value lat-good" id="latency">42</div>
+          <div class="stat-unit">ms</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">📦 总流量</div>
+          <div class="stat-value" id="totalTraffic">2.31</div>
+          <div class="stat-unit">GB 今日</div>
+        </div>
+      </div>
+
+      <!-- Speed Chart -->
+      <div class="card chart-card">
+        <div class="chart-header">
+          <div class="chart-title">实时速率曲线</div>
+          <div class="chart-legend">
+            <span><span class="legend-dot" style="background:#22c55e"></span>上传</span>
+            <span><span class="legend-dot" style="background:#3b82f6"></span>下载</span>
+          </div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="speedChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Quick switch -->
+      <div class="card card-sm" style="margin-bottom:20px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div style="font-size:14px;font-weight:600">快速切换节点</div>
+          <a href="#" onclick="switchTab('nodes');return false" style="font-size:12px;color:var(--accent)">查看全部</a>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap" id="quickNodes"></div>
+      </div>
+    </div>
+
+    <!-- ══════════════ NODES ══════════════ -->
+    <div class="tab-panel" id="tab-nodes">
+      <div class="page-header">
+        <div>
+          <div class="page-title">节点列表</div>
+          <div class="page-subtitle" id="nodeCount">共 12 个节点 · 3 个分组</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="testAllNodes()">⚡ 全部测速</button>
+          <button class="btn primary" onclick="switchTab('import')">＋ 导入</button>
+        </div>
+      </div>
+
+      <div class="node-toolbar">
+        <div class="search-wrap">
+          <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input class="search-box" id="nodeSearch" placeholder="搜索节点名称或地区..." oninput="filterNodes()">
+        </div>
+        <button class="btn" onclick="testAllNodes()">🔄 刷新延迟</button>
+      </div>
+
+      <div class="node-groups" id="groupChips"></div>
+      <div class="node-list" id="nodeList"></div>
+    </div>
+
+    <!-- ══════════════ IMPORT ══════════════ -->
+    <div class="tab-panel" id="tab-import">
+      <div class="page-header">
+        <div>
+          <div class="page-title">导入配置</div>
+          <div class="page-subtitle">支持 sing-box / Xray / v2ray 脚本一键导入</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:20px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:16px">选择导入方式</div>
+        <div class="import-modes">
+          <div class="import-mode-btn active" onclick="setImportMode('url',this)">
+            <div class="import-mode-icon">🔗</div>
+            <div class="import-mode-label">订阅链接</div>
+          </div>
+          <div class="import-mode-btn" onclick="setImportMode('uri',this)">
+            <div class="import-mode-icon">📋</div>
+            <div class="import-mode-label">URI 粘贴</div>
+          </div>
+          <div class="import-mode-btn" onclick="setImportMode('file',this)">
+            <div class="import-mode-icon">📄</div>
+            <div class="import-mode-label">配置文件</div>
+          </div>
+          <div class="import-mode-btn" onclick="setImportMode('qr',this)">
+            <div class="import-mode-icon">📷</div>
+            <div class="import-mode-label">二维码</div>
+          </div>
+        </div>
+
+        <div id="importUrlArea">
+          <div class="import-area">
+            <textarea id="importInput" rows="4" placeholder="粘贴订阅链接，支持：
+https://your.domain/sub?token=xxx  (233boy/sing-box 格式)
+https://your.domain/v2ray/sub  (mack-a/v2ray-agent 格式)
+https://your.domain/singbox  (yonggekkk 格式)"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn primary" onclick="parseImport()" style="padding:10px 24px">
+              解析导入
+            </button>
+            <button class="btn" onclick="pasteFromClipboard()">📋 从剪贴板粘贴</button>
+            <div style="flex:1"></div>
+            <span style="font-size:12px;color:var(--text3)">支持 vmess:// vless:// trojan:// ss:// hysteria2:// tuic://</span>
+          </div>
+        </div>
+
+        <div class="import-result" id="importResult">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-size:16px" id="importResultIcon">✅</span>
+            <span style="font-size:14px;font-weight:600" id="importResultTitle">成功解析 6 个节点</span>
+          </div>
+          <div style="font-size:12px;color:var(--text2)" id="importResultDesc">检测到脚本来源：<b style="color:var(--text)">233boy/sing-box</b>，已自动适配解析格式</div>
+          <div class="autofix-tag" id="autofixTag" style="display:none">
+            🔧 自动修复了 2 项配置问题
+          </div>
+          <div class="progress-bar"><div class="progress-fill" id="importProgress" style="width:0%"></div></div>
+        </div>
+
+        <div class="parsed-node-list" id="parsedNodeList" style="margin-top:14px;display:none"></div>
+      </div>
+
+      <!-- Supported script types -->
+      <div class="card card-sm">
+        <div style="font-size:13px;font-weight:600;margin-bottom:12px;color:var(--text2)">支持的脚本来源</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">233boy/sing-box</div>
+            <div style="color:var(--text3)">VLESS REALITY / Hysteria2</div>
+          </div>
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">233boy/Xray</div>
+            <div style="color:var(--text3)">VMess / VLESS / Trojan</div>
+          </div>
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">233boy/v2ray</div>
+            <div style="color:var(--text3)">VMess WS / gRPC</div>
+          </div>
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">mack-a/v2ray-agent</div>
+            <div style="color:var(--text3)">全协议 · 多用户管理</div>
+          </div>
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">yonggekkk/sing-box-yg</div>
+            <div style="color:var(--text3)">sing-box 一键脚本</div>
+          </div>
+          <div style="background:var(--surface);border-radius:8px;padding:10px 12px;font-size:12px">
+            <div style="font-weight:700;color:var(--text);margin-bottom:2px">通用格式</div>
+            <div style="color:var(--text3)">Base64 / JSON / YAML</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══════════════ LOGS ══════════════ -->
+    <div class="tab-panel" id="tab-logs">
+      <div class="page-header">
+        <div>
+          <div class="page-title">运行日志</div>
+          <div class="page-subtitle">sing-box 内核实时输出</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" onclick="clearLogs()">🗑 清空</button>
+          <button class="btn" onclick="exportLogs()">💾 导出</button>
+        </div>
+      </div>
+      <div class="log-toolbar">
+        <div class="log-filter">
+          <button class="log-filter-btn active" onclick="filterLog('all',this)">全部</button>
+          <button class="log-filter-btn" onclick="filterLog('info',this)">INFO</button>
+          <button class="log-filter-btn" onclick="filterLog('warn',this)">WARN</button>
+          <button class="log-filter-btn" onclick="filterLog('error',this)">ERROR</button>
+        </div>
+        <div style="flex:1"></div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer">
+          <input type="checkbox" checked id="autoScroll" style="accent-color:var(--accent)"> 自动滚动
+        </label>
+      </div>
+      <div class="log-area" id="logArea"></div>
+    </div>
+
+    <!-- ══════════════ SETTINGS ══════════════ -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="page-header">
+        <div><div class="page-title">设置</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+        <div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="settings-section">
+              <div class="settings-title">核心引擎</div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">代理核心</div>
+                  <div class="setting-desc">选择运行的代理内核</div>
+                </div>
+                <select class="select-input" id="coreSelect" onchange="saveCore()">
+                  <option value="singbox" selected>sing-box 1.9.x</option>
+                  <option value="xray">Xray-core 1.8.x</option>
+                  <option value="v2ray">v2ray-core 5.x</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">TUN 模式</div>
+                  <div class="setting-desc">全局透明代理（需管理员权限）</div>
+                </div>
+                <div class="toggle-switch on" id="tunToggle" onclick="toggleSetting(this,'tun')"></div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">自动重连</div>
+                  <div class="setting-desc">断线后自动重新连接</div>
+                </div>
+                <div class="toggle-switch on" onclick="toggleSetting(this,'autoReconnect')"></div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">Mux 多路复用</div>
+                  <div class="setting-desc">减少 TCP 握手开销</div>
+                </div>
+                <div class="toggle-switch" onclick="toggleSetting(this,'mux')"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="settings-section">
+              <div class="settings-title">DNS</div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">DNS 防泄漏</div>
+                  <div class="setting-desc">强制所有 DNS 经过代理</div>
+                </div>
+                <div class="toggle-switch on" onclick="toggleSetting(this,'dnsLeak')"></div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">远端 DNS</div>
+                  <div class="setting-desc">加密 DNS 服务器地址</div>
+                </div>
+                <select class="select-input">
+                  <option>https://1.1.1.1/dns-query</option>
+                  <option>https://8.8.8.8/dns-query</option>
+                  <option>https://dns.alidns.com/dns-query</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card" style="margin-bottom:20px">
+            <div class="settings-section">
+              <div class="settings-title">分流规则</div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">规则模式</div>
+                  <div class="setting-desc">代理流量过滤策略</div>
+                </div>
+                <select class="select-input">
+                  <option>规则分流（GeoSite）</option>
+                  <option>全局代理</option>
+                  <option>直连模式</option>
+                </select>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">GeoIP 数据库</div>
+                  <div class="setting-desc">最后更新：2025-12-01</div>
+                </div>
+                <button class="btn" style="font-size:12px;padding:6px 12px" onclick="showToast('🔄 正在更新 GeoIP 数据库...')">更新</button>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">自定义规则</div>
+                  <div class="setting-desc">3 条规则已启用</div>
+                </div>
+                <button class="btn" style="font-size:12px;padding:6px 12px">管理</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="settings-section">
+              <div class="settings-title">自动化</div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">自动修复配置</div>
+                  <div class="setting-desc">导入时自动修正常见错误</div>
+                </div>
+                <div class="toggle-switch on" onclick="toggleSetting(this,'autofix')"></div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">连接后自动测试</div>
+                  <div class="setting-desc">检测 Google / Cloudflare 可用性</div>
+                </div>
+                <div class="toggle-switch on" onclick="toggleSetting(this,'autotest')"></div>
+              </div>
+              <div class="setting-row">
+                <div class="setting-info">
+                  <div class="setting-name">核心崩溃自动重启</div>
+                  <div class="setting-desc">检测到进程退出时自动恢复</div>
+                </div>
+                <div class="toggle-switch on" onclick="toggleSetting(this,'autorestart')"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ─── Import Quick Modal ─── -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div class="modal-title">快速添加节点</div>
+    <div style="font-size:13px;color:var(--text2);margin-bottom:12px">粘贴分享链接或 URI</div>
+    <textarea id="modalInput" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:13px;font-family:monospace;resize:none;outline:none;min-height:80px" placeholder="vmess://... 或 vless://... 或订阅链接"></textarea>
+    <div class="modal-row">
+      <button class="btn" onclick="closeImportModal()">取消</button>
+      <button class="btn primary" onclick="quickImport()">导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Toast ─── -->
+<div class="toast" id="toast">
+  <span class="toast-icon" id="toastIcon">✅</span>
+  <span id="toastMsg">操作成功</span>
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const NODES = [
+  { id:1, name:'日本 Tokyo 01', flag:'🇯🇵', group:'亚太', proto:'VLESS+REALITY', server:'103.218.64.12', port:443, latency:42, speed:'↓35MB', up:'↑5.2MB', selected:true, source:'233boy/sing-box' },
+  { id:2, name:'新加坡 SG-Prime', flag:'🇸🇬', group:'亚太', proto:'Hysteria2', server:'103.100.72.8', port:8443, latency:68, speed:'↓89MB', up:'↑12MB', selected:false, source:'mack-a' },
+  { id:3, name:'美国 Los Angeles', flag:'🇺🇸', group:'北美', proto:'VLESS+WS+TLS', server:'172.67.82.4', port:443, latency:156, speed:'↓28MB', up:'↑4.1MB', selected:false, source:'yonggekkk' },
+  { id:4, name:'香港 HK-Ultra', flag:'🇭🇰', group:'亚太', proto:'Trojan+TLS', server:'43.153.86.19', port:443, latency:18, speed:'↓120MB', up:'↑18MB', selected:false, source:'233boy/Xray' },
+  { id:5, name:'德国 Frankfurt', flag:'🇩🇪', group:'欧洲', proto:'VMess+WS', server:'104.21.44.7', port:80, latency:212, speed:'↓15MB', up:'↑2.3MB', selected:false, source:'v2ray' },
+  { id:6, name:'韩国 Seoul 03', flag:'🇰🇷', group:'亚太', proto:'TUIC v5', server:'211.249.220.4', port:8443, latency:55, speed:'↓60MB', up:'↑9.8MB', selected:false, source:'yonggekkk' },
+  { id:7, name:'台湾 TW-Speed', flag:'🇹🇼', group:'亚太', proto:'Shadowsocks', server:'60.251.90.3', port:8388, latency:35, speed:'↓48MB', up:'↑7.1MB', selected:false, source:'mack-a' },
+  { id:8, name:'英国 London', flag:'🇬🇧', group:'欧洲', proto:'WireGuard', server:'185.246.208.7', port:51820, latency:188, speed:'↓22MB', up:'↑3.4MB', selected:false, source:'手动配置' },
+  { id:9, name:'美国 New York', flag:'🇺🇸', group:'北美', proto:'VLESS+GRPC', server:'104.16.91.23', port:443, latency:145, speed:'↓31MB', up:'↑5.6MB', selected:false, source:'233boy/sing-box' },
+  { id:10, name:'日本 Osaka 02', flag:'🇯🇵', group:'亚太', proto:'VMess+gRPC', server:'45.76.132.8', port:443, latency:48, speed:'↓52MB', up:'↑8.2MB', selected:false, source:'233boy/v2ray' },
+  { id:11, name:'法国 Paris', flag:'🇫🇷', group:'欧洲', proto:'Trojan+gRPC', server:'51.158.118.4', port:443, latency:195, speed:'↓18MB', up:'↑2.8MB', selected:false, source:'mack-a' },
+  { id:12, name:'澳大利亚 Sydney', flag:'🇦🇺', group:'大洋洲', proto:'Hysteria2', server:'139.99.130.9', port:8443, latency:112, speed:'↓41MB', up:'↑6.5MB', selected:false, source:'yonggekkk' },
+];
+
+let connected = true;
+let currentGroup = '全部';
+let uptimeSeconds = 5077;
+
+// ═══════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  const navMap = {dashboard:0, nodes:1, import:2, logs:3, settings:4};
+  document.querySelectorAll('.nav-item')[navMap[name]]?.classList.add('active');
+}
+
+// ═══════════════════════════════════════════
+// SPEED CHART
+// ═══════════════════════════════════════════
+const MAX_POINTS = 40;
+const upData = Array.from({length:MAX_POINTS},()=>+(Math.random()*5+1).toFixed(1));
+const downData = Array.from({length:MAX_POINTS},()=>+(Math.random()*25+5).toFixed(1));
+const labels = Array.from({length:MAX_POINTS},()=>'');
+
+const ctx = document.getElementById('speedChart').getContext('2d');
+const speedChart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels,
+    datasets: [
+      {
+        label: '上传',
+        data: upData,
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.08)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+      },
+      {
+        label: '下载',
+        data: downData,
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59,130,246,0.08)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 0,
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 200 },
+    scales: {
+      x: { display: false },
+      y: {
+        display: true,
+        grid: { color: 'rgba(255,255,255,0.05)' },
+        ticks: { color: 'rgba(240,240,245,0.4)', font:{size:10}, callback: v => v+'MB' },
+        border: { display: false }
+      }
+    },
+    plugins: { legend: { display: false } }
+  }
+});
+
+function updateChart() {
+  if (!connected) {
+    upData.push(0); downData.push(0);
+  } else {
+    const newUp = +(Math.random()*6+0.5).toFixed(1);
+    const newDown = +(Math.random()*28+4).toFixed(1);
+    upData.push(newUp); downData.push(newDown);
+    document.getElementById('upSpeed').textContent = newUp.toFixed(1);
+    document.getElementById('downSpeed').textContent = newDown.toFixed(1);
+  }
+  if (upData.length > MAX_POINTS) { upData.shift(); downData.shift(); }
+  speedChart.update('none');
+}
+setInterval(updateChart, 800);
+
+// ═══════════════════════════════════════════
+// UPTIME COUNTER
+// ═══════════════════════════════════════════
+function fmtTime(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sec = s%60;
+  return [h,m,sec].map(x=>String(x).padStart(2,'0')).join(':');
+}
+setInterval(()=>{
+  if(connected) { uptimeSeconds++; document.getElementById('uptime').textContent = fmtTime(uptimeSeconds); }
+}, 1000);
+
+// ═══════════════════════════════════════════
+// CONNECTION TOGGLE
+// ═══════════════════════════════════════════
+function toggleConnection() {
+  connected = !connected;
+  const btn = document.getElementById('toggleBtn');
+  const dot = document.getElementById('statusDot');
+  const label = document.getElementById('statusLabel');
+  const ip = document.getElementById('connectIp');
+
+  if (connected) {
+    btn.className = 'toggle-btn on';
+    btn.querySelector('.toggle-icon').textContent = '⏻';
+    document.getElementById('toggleLabel').textContent = '断开';
+    dot.classList.remove('off');
+    label.textContent = '已连接';
+    ip.textContent = '103.218.64.X';
+    showToast('✅ 已连接到 ' + NODES.find(n=>n.selected).name);
+    addLog('ok','CONNECT','已成功建立连接 via VLESS+REALITY');
+  } else {
+    btn.className = 'toggle-btn off';
+    btn.querySelector('.toggle-icon').textContent = '⏻';
+    document.getElementById('toggleLabel').textContent = '连接';
+    dot.classList.add('off');
+    label.textContent = '未连接';
+    ip.textContent = '–';
+    document.getElementById('upSpeed').textContent = '0.0';
+    document.getElementById('downSpeed').textContent = '0.0';
+    showToast('⏸ 已断开连接', 'info');
+    addLog('warn','DISCONNECT','用户主动断开连接');
+  }
+}
+
+// ═══════════════════════════════════════════
+// NODE LIST
+// ═══════════════════════════════════════════
+function latClass(ms) {
+  if (!ms) return 'lat-na';
+  if (ms < 80) return 'lat-good';
+  if (ms < 180) return 'lat-mid';
+  return 'lat-bad';
+}
+function latStr(ms) {
+  return ms ? ms + 'ms' : '–';
+}
+
+function renderNodes() {
+  const q = document.getElementById('nodeSearch').value.toLowerCase();
+  const groups = ['全部', ...new Set(NODES.map(n=>n.group))];
+
+  // Render group chips
+  const gc = document.getElementById('groupChips');
+  gc.innerHTML = groups.map(g => `
+    <div class="group-chip ${g===currentGroup?'active':''}" onclick="selectGroup('${g}')">${g}
+      <span style="opacity:0.6;font-size:10px;margin-left:3px">${g==='全部'?NODES.length:NODES.filter(n=>n.group===g).length}</span>
+    </div>`).join('');
+
+  const filtered = NODES.filter(n => {
+    const matchGroup = currentGroup === '全部' || n.group === currentGroup;
+    const matchQ = !q || n.name.toLowerCase().includes(q) || n.proto.toLowerCase().includes(q) || n.group.toLowerCase().includes(q);
+    return matchGroup && matchQ;
+  });
+
+  document.getElementById('nodeCount').textContent = `共 ${NODES.length} 个节点 · ${new Set(NODES.map(n=>n.group)).size} 个分组`;
+
+  document.getElementById('nodeList').innerHTML = filtered.map(n => `
+    <div class="node-item ${n.selected?'selected':''}" onclick="selectNode(${n.id})">
+      <div class="node-flag">${n.flag}</div>
+      <div class="node-info">
+        <div class="node-name">${n.name}</div>
+        <div class="node-detail">
+          <span class="proto-badge">${n.proto}</span>
+          <span>${n.server}:${n.port}</span>
+          <span style="color:var(--text3)">${n.source}</span>
+        </div>
+      </div>
+      <div class="speed-badge" id="speed-${n.id}">${n.speed}</div>
+      <div class="node-latency ${latClass(n.latency)}" id="lat-${n.id}">${latStr(n.latency)}</div>
+      <div class="node-actions">
+        <button class="icon-btn" title="测速" onclick="event.stopPropagation();testNode(${n.id})">⚡</button>
+        <button class="icon-btn" title="删除" onclick="event.stopPropagation();deleteNode(${n.id})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function selectGroup(g) { currentGroup = g; renderNodes(); }
+function filterNodes() { renderNodes(); }
+
+function selectNode(id) {
+  NODES.forEach(n => n.selected = (n.id === id));
+  const node = NODES.find(n=>n.id===id);
+  document.getElementById('connectNode').textContent = node.flag + ' ' + node.name;
+  document.getElementById('connectMeta').innerHTML = `通过 <span id="connectNode">${node.flag} ${node.name}</span> · ${node.proto} · sing-box 1.9.x`;
+  renderNodes();
+  renderQuickNodes();
+  if (connected) {
+    showToast('🔄 已切换到 ' + node.name);
+    addLog('info','SWITCH','切换节点 → ' + node.name + ' (' + node.proto + ')');
+    addLog('ok','CONNECT','新节点连接成功，延迟 ' + node.latency + 'ms');
+  }
+}
+
+function deleteNode(id) {
+  const idx = NODES.findIndex(n=>n.id===id);
+  const name = NODES[idx].name;
+  NODES.splice(idx,1);
+  renderNodes();
+  renderQuickNodes();
+  showToast('🗑 已移除节点：' + name, 'warn');
+}
+
+function testNode(id) {
+  const el = document.getElementById('lat-' + id);
+  el.textContent = '测试中...';
+  el.className = 'node-latency testing';
+  setTimeout(()=>{
+    const ms = Math.floor(Math.random()*200+15);
+    const n = NODES.find(n=>n.id===id);
+    n.latency = ms;
+    el.textContent = ms + 'ms';
+    el.className = 'node-latency ' + latClass(ms);
+    addLog('info','PING','[' + n.name + '] 延迟 ' + ms + 'ms');
+  }, 1000 + Math.random()*1000);
+}
+
+function testAllNodes() {
+  showToast('⚡ 正在测试全部节点延迟...');
+  addLog('info','PING','开始批量延迟测试（' + NODES.length + ' 节点）');
+  NODES.forEach((n,i) => {
+    setTimeout(()=>{
+      const ms = Math.floor(Math.random()*250+12);
+      n.latency = ms;
+      const el = document.getElementById('lat-' + n.id);
+      if (el) { el.textContent = ms + 'ms'; el.className = 'node-latency ' + latClass(ms); }
+    }, i*200 + Math.random()*300);
+  });
+  setTimeout(()=>{ showToast('✅ 延迟测试完成'); addLog('ok','PING','批量测试完成'); }, NODES.length*300);
+}
+
+function runSpeedTest() {
+  showToast('🚀 测速中，请稍候...');
+  addLog('info','SPEEDTEST','开始真实带宽测速 (via Cloudflare)');
+  setTimeout(()=>{
+    showToast('✅ 测速完成：↓38.4MB/s ↑6.1MB/s');
+    addLog('ok','SPEEDTEST','测速结果：下载 38.4 MB/s，上传 6.1 MB/s，延迟 42ms');
+  }, 3000);
+}
+
+// Quick nodes on dashboard
+function renderQuickNodes() {
+  const top = [...NODES].sort((a,b)=>a.latency-b.latency).slice(0,5);
+  document.getElementById('quickNodes').innerHTML = top.map(n=>`
+    <div onclick="selectNode(${n.id})" style="cursor:pointer;background:var(--surface);border:1px solid ${n.selected?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px 14px;font-size:13px;transition:all 0.15s;flex:1;min-width:140px;max-width:200px">
+      <div style="font-size:20px;margin-bottom:4px">${n.flag}</div>
+      <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.name.replace(/^.*? /,'')}</div>
+      <div class="${latClass(n.latency)}" style="font-size:12px;font-weight:700;margin-top:2px">${latStr(n.latency)}</div>
+    </div>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// IMPORT
+// ═══════════════════════════════════════════
+const EXAMPLE_NODES = [
+  { name:'🇯🇵 Tokyo-Direct', proto:'VLESS+REALITY', ok:true, fix:false },
+  { name:'🇸🇬 Singapore-H2', proto:'Hysteria2', ok:true, fix:false },
+  { name:'🇺🇸 LA-VMess-WS', proto:'VMess+WS', ok:true, fix:true, fixMsg:'修复 encryption 字段（auto→none）' },
+  { name:'🇭🇰 HK-Trojan', proto:'Trojan+TLS', ok:true, fix:false },
+  { name:'🇩🇪 Frankfurt-SS', proto:'Shadowsocks', ok:true, fix:true, fixMsg:'修复 ALPN 不匹配问题' },
+  { name:'🇹🇼 Taiwan-WG', proto:'WireGuard', ok:true, fix:false },
+];
+
+let importMode = 'url';
+function setImportMode(mode, el) {
+  importMode = mode;
+  document.querySelectorAll('.import-mode-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const ph = {
+    url: `粘贴订阅链接，支持：\nhttps://your.domain/sub?token=xxx  (233boy/sing-box 格式)\nhttps://your.domain/v2ray/sub  (mack-a/v2ray-agent 格式)\nhttps://your.domain/singbox  (yonggekkk 格式)`,
+    uri: `粘贴多个节点 URI，每行一个：\nvmess://ew0KICAidiI6ICIyIiw...\nvless://abc123@1.2.3.4:443?...\ntrojan://password@host:443#name`,
+    file: `将 .json / .yaml / .conf 配置文件拖放到此处，或点击选择文件`,
+    qr: `移动端支持扫描二维码，桌面端请使用其他导入方式`
+  };
+  document.getElementById('importInput').placeholder = ph[mode];
+}
+
+function pasteFromClipboard() {
+  // Mock paste
+  const examples = [
+    'vmess://eyJ2IjoiMiIsInBzIjoiVE9LWU8tMDEiLCJhZGQiOiIxMDMuMjE4LjY0LjEyIiwicG9ydCI6IjQ0MyIsImlkIjoiYWJjMTIzNDUtMTIzNC0xMjM0LTEyMzQtYWJjMTIzNDU2Nzg5IiwiYWlkIjoiMCIsIm5ldCI6IndzIiwidHlwZSI6Im5vbmUiLCJob3N0IjoiIiwicGF0aCI6Ii93cyIsInRscyI6InRscyJ9',
+    'vless://abc12345-1234-1234-1234-abc123456789@103.218.64.12:443?encryption=none&security=reality&sni=yahoo.com&fp=chrome&pbk=xxx&type=tcp#JP-Tokyo',
+  ];
+  document.getElementById('importInput').value = examples.join('\n');
+  showToast('📋 已从剪贴板粘贴');
+}
+
+function parseImport() {
+  const val = document.getElementById('importInput').value.trim();
+  if (!val) { showToast('⚠️ 请先输入内容', 'warn'); return; }
+
+  const result = document.getElementById('importResult');
+  const progress = document.getElementById('importProgress');
+  const parsedList = document.getElementById('parsedNodeList');
+  result.className = 'import-result visible';
+  result.querySelector('#importResultIcon').textContent = '⏳';
+  result.querySelector('#importResultTitle').textContent = '正在解析...';
+  result.querySelector('#importResultDesc').textContent = '自动识别脚本类型...';
+  document.getElementById('autofixTag').style.display = 'none';
+  parsedList.style.display = 'none';
+  progress.style.width = '0%';
+
+  // Detect source
+  let source = '通用格式';
+  if (val.includes('233boy')) source = '233boy/sing-box';
+  else if (val.includes('v2ray-agent') || val.includes('mack-a')) source = 'mack-a/v2ray-agent';
+  else if (val.includes('singbox') || val.includes('sing-box-yg')) source = 'yonggekkk/sing-box-yg';
+  else if (val.startsWith('vmess://') || val.startsWith('vless://') || val.startsWith('trojan://')) source = 'URI 分享链接';
+
+  let prog = 0;
+  const ticker = setInterval(()=>{ prog += Math.random()*18; progress.style.width=Math.min(prog,92)+'%'; }, 200);
+
+  setTimeout(()=>{
+    clearInterval(ticker);
+    progress.style.width = '100%';
+    const fixCount = EXAMPLE_NODES.filter(n=>n.fix).length;
+    result.querySelector('#importResultIcon').textContent = '✅';
+    result.querySelector('#importResultTitle').textContent = `成功解析 ${EXAMPLE_NODES.length} 个节点`;
+    result.querySelector('#importResultDesc').innerHTML = `检测到脚本来源：<b style="color:var(--text)">${source}</b>，已自动适配解析格式`;
+    if (fixCount > 0) {
+      const tag = document.getElementById('autofixTag');
+      tag.textContent = `🔧 自动修复了 ${fixCount} 项配置问题`;
+      tag.style.display = 'inline-flex';
+      addLog('warn','AUTOFIX',`检测到 ${fixCount} 项配置错误，已自动修正`);
+      EXAMPLE_NODES.filter(n=>n.fix).forEach(n=>addLog('ok','AUTOFIX','['+n.name+'] '+n.fixMsg));
+    }
+
+    parsedList.style.display = 'flex';
+    parsedList.innerHTML = EXAMPLE_NODES.map(n=>`
+      <div class="parsed-node">
+        <span class="${n.ok?'parsed-ok':'parsed-warn'}">${n.ok?'✓':'⚠'}</span>
+        <span style="flex:1;font-weight:600">${n.name}</span>
+        <span class="proto-badge">${n.proto}</span>
+        ${n.fix ? `<span style="font-size:11px;color:var(--yellow)">🔧 已修复</span>` : ''}
+      </div>`).join('');
+
+    // Add nodes to list
+    EXAMPLE_NODES.forEach((en, i) => {
+      if (!NODES.find(n=>n.name.includes(en.name.replace(/^...\s*/,'')))) {
+        NODES.push({
+          id: 100+i, name: en.name, flag: en.name[0]+en.name[1],
+          group: '导入节点', proto: en.proto, server: '–', port: 443,
+          latency: Math.floor(Math.random()*200+20), speed: '–', up: '–',
+          selected: false, source
+        });
+      }
+    });
+    renderNodes(); renderQuickNodes();
+    showToast(`✅ 已导入 ${EXAMPLE_NODES.length} 个节点`);
+    addLog('ok','IMPORT',`成功导入 ${EXAMPLE_NODES.length} 个节点，来源：${source}`);
+  }, 1800);
+}
+
+// ═══════════════════════════════════════════
+// LOGS
+// ═══════════════════════════════════════════
+const INITIAL_LOGS = [
+  {t:'09:12:04', level:'info', msg:'Nexus VPN 已启动，内核版本 sing-box <hl>1.9.3</hl>'},
+  {t:'09:12:05', level:'info', msg:'加载配置文件 config.json'},
+  {t:'09:12:05', level:'ok',   msg:'TUN 接口 <hl>tun0</hl> 创建成功'},
+  {t:'09:12:06', level:'info', msg:'DNS 服务器：<hl>https://1.1.1.1/dns-query</hl>'},
+  {t:'09:12:07', level:'ok',   msg:'连接 <hl>日本 Tokyo 01</hl> (VLESS+REALITY) 成功，延迟 42ms'},
+  {t:'09:14:21', level:'info', msg:'自动测试 google.com → <hl>200 OK</hl> (68ms)'},
+  {t:'09:14:21', level:'info', msg:'自动测试 1.1.1.1 → <hl>可达</hl> (31ms)'},
+  {t:'09:18:55', level:'warn', msg:'节点 美国 LA 延迟超阈值 (312ms)，已记录'},
+  {t:'09:20:11', level:'ok',   msg:'DNS 泄漏检测：<hl>无泄漏</hl>'},
+  {t:'09:45:03', level:'info', msg:'流量统计：↑ 0.84GB  ↓ 1.47GB'},
+  {t:'10:02:18', level:'ok',   msg:'自动修复：VMess 节点 encryption 字段已纠正 (auto→none)'},
+  {t:'10:02:19', level:'ok',   msg:'自动修复：ALPN 配置不匹配已纠正 [h2,http/1.1]→[h2]'},
+];
+
+let logFilter = 'all';
+function addLog(level, tag, msg) {
+  const now = new Date();
+  const t = [now.getHours(),now.getMinutes(),now.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':');
+  INITIAL_LOGS.push({t, level, msg: `[${tag}] ${msg}`});
+  renderLogs();
+}
+function renderLogs() {
+  const filtered = logFilter==='all' ? INITIAL_LOGS : INITIAL_LOGS.filter(l=>l.level===logFilter);
+  document.getElementById('logArea').innerHTML = filtered.map(l=>`
+    <div class="log-line">
+      <span class="log-time">${l.t}</span>
+      <span class="log-level ${l.level}">${l.level.toUpperCase()}</span>
+      <span class="log-msg">${l.msg.replace(/<hl>(.*?)<\/hl>/g,'<span class="hl">$1</span>')}</span>
+    </div>`).join('');
+  if (document.getElementById('autoScroll')?.checked) {
+    const la = document.getElementById('logArea');
+    la.scrollTop = la.scrollHeight;
+  }
+}
+function filterLog(f, el) {
+  logFilter = f;
+  document.querySelectorAll('.log-filter-btn').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  renderLogs();
+}
+function clearLogs() { INITIAL_LOGS.length = 0; renderLogs(); showToast('🗑 日志已清空'); }
+function exportLogs() { showToast('💾 日志已导出到 nexus-vpn.log'); }
+
+// ═══════════════════════════════════════════
+// SETTINGS
+// ═══════════════════════════════════════════
+function toggleSetting(el, key) {
+  el.classList.toggle('on');
+  const isOn = el.classList.contains('on');
+  showToast(`${isOn?'✅':'⏸'} ${key} 已${isOn?'开启':'关闭'}`);
+  addLog('info','SETTING',`${key} → ${isOn?'enabled':'disabled'}`);
+}
+function saveCore() {
+  const v = document.getElementById('coreSelect').value;
+  showToast('✅ 内核已切换为 ' + v);
+  addLog('ok','CORE','切换代理核心 → ' + v);
+}
+
+// ═══════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════
+function openImportModal() { document.getElementById('importModal').classList.add('open'); }
+function closeImportModal() { document.getElementById('importModal').classList.remove('open'); }
+function quickImport() {
+  const v = document.getElementById('modalInput').value.trim();
+  if (!v) return;
+  closeImportModal();
+  switchTab('import');
+  document.getElementById('importInput').value = v;
+  parseImport();
+}
+document.getElementById('importModal').addEventListener('click', e => {
+  if (e.target === document.getElementById('importModal')) closeImportModal();
+});
+
+// ═══════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+// ═══════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════
+renderNodes();
+renderQuickNodes();
+renderLogs();
+
+// Simulate live log entries
+const liveLogs = [
+  [3000,'info','TRAFFIC','当前速率 ↓18.7 MB/s ↑3.2 MB/s'],
+  [6000,'ok','HEALTH','内核健康检查通过'],
+  [10000,'info','DNS','已解析 api.github.com → 140.82.113.6'],
+  [14000,'warn','LATENCY','节点 德国 Frankfurt 延迟升高 (212ms)'],
+  [18000,'ok','PING','自动延迟测试完成，最优节点 香港 HK-Ultra (18ms)'],
+];
+liveLogs.forEach(([delay,level,tag,msg])=>{
+  setTimeout(()=>addLog(level,tag,msg), delay);
+});
+</script>
+</body>
+</html>
