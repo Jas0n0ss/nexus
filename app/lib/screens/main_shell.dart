@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../providers/shell_nav.dart';
 import 'dashboard_screen.dart';
 import 'nodes_screen.dart';
 import 'import_screen.dart';
 import 'logs_screen.dart';
 import 'settings_screen.dart';
 
-class MainShell extends StatefulWidget {
+class MainShell extends StatelessWidget {
   const MainShell({super.key});
-  @override State<MainShell> createState() => _MainShellState();
-}
 
-class _MainShellState extends State<MainShell> {
-  int _index = 0;
-
-  final _screens = const [
+  static const _screens = [
     DashboardScreen(),
     NodesScreen(),
     ImportScreen(),
@@ -23,18 +21,32 @@ class _MainShellState extends State<MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final nav = context.watch<ShellNav>();
     final isDesktop = MediaQuery.of(context).size.width > 720;
-    if (isDesktop) return _DesktopLayout(index: _index, onNav: (i) => setState(() => _index = i), screens: _screens);
-    return _MobileLayout(index: _index, onNav: (i) => setState(() => _index = i), screens: _screens);
+    if (isDesktop) {
+      return _DesktopLayout(
+        index: nav.index,
+        onNav: nav.goTo,
+        screens: _screens,
+      );
+    }
+    return _MobileLayout(
+      index: nav.index,
+      onNav: nav.goTo,
+      screens: _screens,
+    );
   }
 }
 
-// ── Desktop: left sidebar ──────────────────────────────────────────────────────
 class _DesktopLayout extends StatelessWidget {
   final int index;
   final ValueChanged<int> onNav;
   final List<Widget> screens;
-  const _DesktopLayout({required this.index, required this.onNav, required this.screens});
+  const _DesktopLayout({
+    required this.index,
+    required this.onNav,
+    required this.screens,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +55,6 @@ class _DesktopLayout extends StatelessWidget {
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar
           Container(
             width: 220,
             decoration: BoxDecoration(
@@ -53,22 +64,27 @@ class _DesktopLayout extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 28),
-                // Logo
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(children: [
                     Container(
-                      width: 32, height: 32,
+                      width: 32,
+                      height: 32,
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF6366F1)]),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                        ),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Center(child: Text('🌐', style: TextStyle(fontSize: 16))),
+                      child: const Icon(Icons.shield_rounded, color: Colors.white, size: 18),
                     ),
                     const SizedBox(width: 10),
                     Text('Nexus VPN', style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3, color: cs.onSurface)),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                      color: cs.onSurface,
+                    )),
                   ]),
                 ),
                 const SizedBox(height: 24),
@@ -81,12 +97,12 @@ class _DesktopLayout extends StatelessWidget {
                 const Spacer(),
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text('v1.0.0', style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.3))),
+                  child: Text('v1.0.0',
+                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.3))),
                 ),
               ],
             ),
           ),
-          // Content
           Expanded(child: screens[index]),
         ],
       ),
@@ -94,10 +110,15 @@ class _DesktopLayout extends StatelessWidget {
   }
 
   Widget _navSection(BuildContext ctx, String label) => Padding(
-    padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-    child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-      letterSpacing: 0.8, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.3))),
-  );
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
+        child: Text(label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.3),
+            )),
+      );
 
   Widget _navItem(BuildContext ctx, int i, IconData icon, String label) {
     final active = index == i;
@@ -116,11 +137,14 @@ class _DesktopLayout extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Row(children: [
-              Icon(icon, size: 17,
-                color: active ? cs.primary : cs.onSurface.withOpacity(0.5)),
+              Icon(icon, size: 17, color: active ? cs.primary : cs.onSurface.withOpacity(0.5)),
               const SizedBox(width: 10),
-              Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500,
-                color: active ? cs.onSurface : cs.onSurface.withOpacity(0.55))),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: active ? cs.onSurface : cs.onSurface.withOpacity(0.55),
+                  )),
             ]),
           ),
         ),
@@ -129,12 +153,15 @@ class _DesktopLayout extends StatelessWidget {
   }
 }
 
-// ── Mobile: bottom tab bar ─────────────────────────────────────────────────────
 class _MobileLayout extends StatelessWidget {
   final int index;
   final ValueChanged<int> onNav;
   final List<Widget> screens;
-  const _MobileLayout({required this.index, required this.onNav, required this.screens});
+  const _MobileLayout({
+    required this.index,
+    required this.onNav,
+    required this.screens,
+  });
 
   @override
   Widget build(BuildContext context) {

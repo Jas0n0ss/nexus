@@ -50,7 +50,7 @@ class NexusApp extends StatelessWidget {
         bodySmall:    TextStyle(color: text.withOpacity(0.45), fontSize: 12),
         labelSmall:   TextStyle(color: text.withOpacity(0.35), fontSize: 11, letterSpacing: 0.6),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: isDark ? const Color(0xFF1C1C24) : Colors.white,
         elevation: 0,
         shape: RoundedRectangleBorder(

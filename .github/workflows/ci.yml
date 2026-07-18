@@ -152,15 +152,17 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          # packaging/ survives (outside android/); also backup VpnService
+          # packaging/ survives (outside android/); backup native Kotlin overlays
           mkdir -p /tmp/fb/android/app/src/main/kotlin/com/nexusvpn
-          if [ -f android/app/src/main/kotlin/com/nexusvpn/VpnService.kt ]; then
-            cp android/app/src/main/kotlin/com/nexusvpn/VpnService.kt \
-               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/
-          elif [ -f packaging/android/VpnService.kt ]; then
-            cp packaging/android/VpnService.kt \
-               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/
-          fi
+          for f in VpnService.kt MainActivity.kt; do
+            if [ -f "android/app/src/main/kotlin/com/nexusvpn/$f" ]; then
+              cp "android/app/src/main/kotlin/com/nexusvpn/$f" \
+                 "/tmp/fb/android/app/src/main/kotlin/com/nexusvpn/"
+            elif [ -f "packaging/android/$f" ]; then
+              cp "packaging/android/$f" \
+                 "/tmp/fb/android/app/src/main/kotlin/com/nexusvpn/"
+            fi
+          done
           # Remove partial platform dirs so flutter create regenerates them fully
           rm -rf android ios macos windows linux
           flutter create \
@@ -169,10 +171,14 @@ jobs:
             --platforms=android,ios,linux,macos,windows \
             --no-pub \
             .
-          # Restore custom native sources
+          # Restore custom native sources (apply_release_config also copies from packaging/)
           mkdir -p android/app/src/main/kotlin/com/nexusvpn
-          cp -f /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/VpnService.kt \
-                android/app/src/main/kotlin/com/nexusvpn/VpnService.kt
+          for f in VpnService.kt MainActivity.kt; do
+            if [ -f "/tmp/fb/android/app/src/main/kotlin/com/nexusvpn/$f" ]; then
+              cp -f "/tmp/fb/android/app/src/main/kotlin/com/nexusvpn/$f" \
+                    "android/app/src/main/kotlin/com/nexusvpn/$f"
+            fi
+          done
           # Apply release signing + installable manifest (NOT Android Debug cert)
           bash packaging/android/apply_release_config.sh
           echo "✅ Android scaffold + release config applied"
