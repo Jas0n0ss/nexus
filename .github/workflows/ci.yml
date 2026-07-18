@@ -556,8 +556,16 @@ jobs:
         working-directory: app
         run: flutter build windows --release --no-pub
 
-      - name: Install Inno Setup 6
-        run: choco install innosetup --version 6.2.2 --no-progress -y
+      - name: Install Inno Setup 6 (if not preinstalled)
+        shell: pwsh
+        run: |
+          # windows-2022 image ships Inno Setup preinstalled; pinning an older
+          # version makes choco fail with "newer version already installed".
+          if (Test-Path "C:\Program Files (x86)\Inno Setup 6\ISCC.exe") {
+            Write-Host "✅ Inno Setup already installed"
+          } else {
+            choco install innosetup --no-progress -y
+          }
 
       - name: Create installer
         shell: pwsh

@@ -141,13 +141,16 @@ class NexusVpnService : VpnService() {
                 Log.d(TAG, "[sing-box] $line")
                 if (line.contains("panic") || line.contains("fatal error")) {
                     Log.e(TAG, "sing-box crash — restarting in 2s")
-                    delay(2000)
+                    // forEachLine's lambda is not a suspend context — use
+                    // Thread.sleep (we're on a Dispatchers.IO worker thread).
+                    Thread.sleep(2000)
                     startSingbox(configFile, tunFd)
                 }
             }
         }
 
-        Log.i(TAG, "sing-box started, PID=${singboxProcess?.pid()}")
+        // NOTE: Process.pid() requires API 33+ — don't rely on it here.
+        Log.i(TAG, "sing-box started")
     }
 
     private fun extractBinary(): File {
@@ -167,9 +170,12 @@ class NexusVpnService : VpnService() {
 
     private fun showNotification(title: String, text: String) {
         createChannel()
+        // Use a system icon — the app's R class lives in the Flutter-generated
+        // package (com.nexusvpn.nexus_vpn) and no custom drawable is bundled.
+        val icon = android.R.drawable.ic_lock_idle_lock
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_vpn)
+                .setSmallIcon(icon)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setOngoing(true)
@@ -177,7 +183,7 @@ class NexusVpnService : VpnService() {
         } else {
             @Suppress("DEPRECATION")
             Notification.Builder(this)
-                .setSmallIcon(R.drawable.ic_vpn)
+                .setSmallIcon(icon)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setOngoing(true)
