@@ -1,7 +1,7 @@
 // ignore_for_file: invalid_annotation_target
-import 'package:hive/hive.dart';
+import 'dart:ui' show Color;
 
-part 'proxy_node.g.dart';
+import 'package:hive/hive.dart';
 
 enum Protocol { vless, vmess, trojan, shadowsocks, hysteria2, tuic, wireguard }
 enum Transport { tcp, ws, grpc, http, quic, none }

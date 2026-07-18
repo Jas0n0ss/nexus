@@ -198,11 +198,15 @@ class NodeParser {
   ProxyNode _tuic(String uri) {
     final u = Uri.parse(uri.replaceFirst('tuic://', 'https://'));
     final p = u.queryParameters;
+    // TUIC v5 URI: tuic://<uuid>:<password>@host:port — Uri has no .password
+    // getter, so split userInfo manually.
+    final userParts = u.userInfo.split(':');
     return ProxyNode(
       id: _uuid(), name: Uri.decodeComponent(u.fragment.isNotEmpty ? u.fragment : u.host),
       flag: _flagFromName(u.fragment), group: _groupFromName(u.fragment),
       protocol: Protocol.tuic, server: u.host, port: u.port,
-      uuid: u.userInfo, password: u.password,
+      uuid: userParts.isNotEmpty ? userParts.first : null,
+      password: userParts.length > 1 ? userParts.sublist(1).join(':') : null,
       transport: Transport.quic, security: Security.tls,
       sni: p['sni'], alpn: p['alpn']?.split(','),
       congestion: p['congestion_control'] ?? 'bbr',

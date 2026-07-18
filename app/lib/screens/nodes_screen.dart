@@ -5,7 +5,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/nodes_provider.dart';
 import '../providers/vpn_provider.dart';
 import '../models/proxy_node.dart';
-import '../widgets/glass_card.dart';
 
 class NodesScreen extends StatelessWidget {
   const NodesScreen({super.key});
