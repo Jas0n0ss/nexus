@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 
 import '../providers/settings_provider.dart';
 import '../providers/vpn_provider.dart';
-import '../theme/nexus_theme.dart';
 import '../widgets/nexus_surface.dart';
 import '../widgets/page_header.dart';
 
