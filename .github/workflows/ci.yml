@@ -1213,89 +1213,26 @@ jobs:
           TAG_NAME="${{ needs.version.outputs.tag_name }}"
           BUILD_NUM="${{ needs.version.outputs.build_num }}"
           COMMIT_SHORT="${GITHUB_SHA::7}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^v${VERSION}$" | head -1 || true)
-
-          if [[ "$VERSION" == *-* ]]; then
-            RELEASE_KIND="预发布（pre-release）"
-          else
-            RELEASE_KIND="正式版"
-          fi
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG_NAME}$" | head -1 || true)
 
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log "${PREV_TAG}..HEAD" \
-              --pretty=format:"- %s" --no-merges | head -40 || true)
-            [ -n "$COMMITS" ] || COMMITS="- No changes listed"
-            VERSION_SUMMARY="相对上一标签 \`${PREV_TAG}\` 的变更如下。"
+              --pretty=format:"- %s" --no-merges | head -30 || true)
           else
-            COMMITS="- 首个公开发布：全平台安装包（macOS / Windows / Linux / Android / iOS）"
-            VERSION_SUMMARY="本仓库的首个版本标签发布。"
+            COMMITS=$(git log -10 --pretty=format:"- %s" --no-merges || true)
           fi
+          [ -n "$COMMITS" ] || COMMITS="- (no commits)"
 
-          # Optional annotated-tag message becomes part of the version notes
-          # (lightweight tags have empty contents — that's fine)
-          TAG_MSG=$(git for-each-ref --format='%(contents)' "refs/tags/${TAG_NAME}" 2>/dev/null | sed '/^$/d' || true)
-
-          # Write notes to a file for body_path. Do not pipe commit lines through
-          # `printf '%s\n' "$COMMITS"` — subjects starting with '-' break printf.
+          # Keep notes short: version line + changelog only.
+          # Assets are already listed by GitHub Release — no download table / README fluff.
           {
-            echo "# Nexus VPN v${VERSION}"
+            echo "## ${TAG_NAME}"
             echo
-            echo '> 跨平台 VPN 客户端 — VLESS+REALITY · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · WireGuard'
+            echo "build \`${BUILD_NUM}\` · \`${COMMIT_SHORT}\`"
             echo
-            echo '## 🏷️ 版本说明'
+            echo "### Changes"
             echo
-            echo '| 项目 | 内容 |'
-            echo '|------|------|'
-            echo "| **Tag** | \`${TAG_NAME}\` |"
-            echo "| **版本号** | \`${VERSION}\` |"
-            echo "| **类型** | ${RELEASE_KIND} |"
-            echo "| **Build** | \`${BUILD_NUM}\` |"
-            echo "| **Commit** | \`${COMMIT_SHORT}\` |"
-            echo
-            echo "${VERSION_SUMMARY}"
-            if [ -n "${TAG_MSG:-}" ]; then
-              echo
-              echo '### Tag 说明'
-              echo
-              echo "${TAG_MSG}"
-            fi
-            echo
-            echo '## 📦 下载'
-            echo
-            echo '| 平台 | 文件 | 说明 |'
-            echo '|------|------|------|'
-            echo "| 🍎 macOS (Apple Silicon + Intel) | \`NexusVPN-${VERSION}-macos.dmg\` | 拖入 Applications |"
-            echo "| 🪟 Windows x64 安装包 | \`NexusVPN-${VERSION}-windows-setup.exe\` | 含 WinTUN，需管理员 |"
-            echo "| 🪟 Windows x64 便携版 | \`NexusVPN-${VERSION}-windows-portable.zip\` | 解压即用 |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.AppImage\` | \`chmod +x\` 后直接运行 |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-amd64.deb\` | Debian/Ubuntu：\`sudo dpkg -i\` |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.rpm\` | Fedora/RHEL/openSUSE：\`sudo rpm -i\` |"
-            echo "| 🤖 Android（推荐） | \`NexusVPN-${VERSION}-android-universal.apk\` | 通用包，直接安装 |"
-            echo "| 🤖 Android arm64 | \`NexusVPN-${VERSION}-android-arm64-v8a.apk\` | 主流手机（体积更小） |"
-            echo "| 🤖 Android armv7 | \`NexusVPN-${VERSION}-android-armeabi-v7a.apk\` | 旧设备 |"
-            echo "| 🤖 Android x86_64 | \`NexusVPN-${VERSION}-android-x86_64.apk\` | 模拟器 |"
-            echo "| 🤖 Android AAB | \`NexusVPN-${VERSION}-android-play.aab\` | 仅用于 Google Play 上架，不能直接安装 |"
-            echo "| 🍏 iOS 未签名 | \`NexusVPN-${VERSION}-ios-unsigned.ipa\` | AltStore / TrollStore |"
-            echo
-            echo '## ⚠️ 注意事项'
-            echo
-            echo '- **Android**: 请下载 \`.apk\`（推荐 universal）。\`.aab\` 不能直接安装。需开启「允许未知来源」'
-            echo '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」'
-            echo '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）'
-            echo '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装'
-            echo
-            echo '## 🔧 核心版本'
-            echo
-            echo "- sing-box \`v${{ env.SING_BOX_VERSION }}\`"
-            echo "- Flutter \`v${{ env.FLUTTER_VERSION }}\`"
-            echo
-            echo "## 📝 更新日志（${TAG_NAME}）"
-            echo
-            # echo is safe for lines beginning with '-'
             echo "$COMMITS"
-            echo
-            echo '---'
-            echo "*Published from tag \`${TAG_NAME}\` · Build \`${BUILD_NUM}\` · Commit \`${COMMIT_SHORT}\`*"
           } > release-notes.md
 
           echo "----- release-notes.md -----"
