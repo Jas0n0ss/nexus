@@ -922,11 +922,55 @@ jobs:
           path: release-assets/
           merge-multiple: true
 
-      - name: List release artifacts
-        run: find release-assets -type f | sort
+      # Flatten any nested artifact dirs and verify every platform package is present
+      # before creating the GitHub Release. Missing required files fail the job.
+      - name: Verify & collect release packages
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
 
-      - name: Generate changelog
-        id: cl
+          # download-artifact may nest by artifact name depending on version/options
+          mkdir -p release-flat
+          while IFS= read -r -d '' f; do
+            cp -f "$f" "release-flat/$(basename "$f")"
+          done < <(find release-assets -type f -print0)
+
+          echo "📦 Collected packages:"
+          find release-flat -type f | sort | sed 's/^/  /'
+
+          # Required for a complete multi-platform release (all platforms)
+          REQUIRED=(
+            "NexusVPN-${VERSION}-macos.dmg"
+            "NexusVPN-${VERSION}-windows-setup.exe"
+            "NexusVPN-${VERSION}-windows-portable.zip"
+            "NexusVPN-${VERSION}-linux-x86_64.AppImage"
+            "NexusVPN-${VERSION}-linux-amd64.deb"
+            "NexusVPN-${VERSION}-linux-x86_64.rpm"
+            "NexusVPN-android-arm64-v8a.apk"
+            "NexusVPN-android-armeabi-v7a.apk"
+            "NexusVPN-android-x86_64.apk"
+            "NexusVPN-android.aab"
+            "NexusVPN-${VERSION}-ios-unsigned.ipa"
+          )
+
+          MISSING=0
+          for f in "${REQUIRED[@]}"; do
+            if [ -f "release-flat/$f" ]; then
+              echo "✅ $f"
+            else
+              echo "❌ missing required: $f"
+              MISSING=1
+            fi
+          done
+          [ "$MISSING" -eq 0 ] || {
+            echo "::error::Release is missing required platform packages — refusing to publish an incomplete release"
+            exit 1
+          }
+
+          COUNT=$(find release-flat -type f | wc -l | tr -d ' ')
+          echo "Will upload ${COUNT} file(s) from release-flat/ to the GitHub Release"
+
+      - name: Generate release notes
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
@@ -938,51 +982,66 @@ jobs:
             [ -n "$COMMITS" ] || COMMITS="- No changes listed"
             RANGE="since \`${PREV_TAG}\`"
           else
-            COMMITS="- Initial release 🎉"
+            COMMITS="- Initial release"
             RANGE="initial"
           fi
 
+          # Write notes to a file for body_path. Do not pipe commit lines through
+          # `printf '%s\n' "$COMMITS"` — subjects starting with '-' break printf.
           {
-            printf 'body<<RELEASE_BODY\n'
-            printf '> 跨平台 VPN 客户端 — VLESS+REALITY · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · WireGuard\n\n'
-            printf '## 📦 下载\n\n'
-            printf '| 平台 | 文件 | 说明 |\n'
-            printf '|------|------|------|\n'
-            printf '| 🍎 macOS (Apple Silicon + Intel) | `NexusVPN-*-macos.dmg` | 拖入 Applications |\n'
-            printf '| 🪟 Windows x64 安装包 | `NexusVPN-*-windows-setup.exe` | 含 WinTUN，需管理员 |\n'
-            printf '| 🪟 Windows x64 便携版 | `NexusVPN-*-windows-portable.zip` | 解压即用 |\n'
-            printf '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |\n'
-            printf '| 🐧 Linux x64 | `NexusVPN-*-linux-amd64.deb` | Debian/Ubuntu：`sudo dpkg -i` |\n'
-            printf '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.rpm` | Fedora/RHEL/openSUSE：`sudo rpm -i` |\n'
-            printf '| 🤖 Android arm64 | `NexusVPN-android-arm64-v8a.apk` | 主流设备推荐 |\n'
-            printf '| 🤖 Android armv7 | `NexusVPN-android-armeabi-v7a.apk` | 旧设备 |\n'
-            printf '| 🤖 Android x86_64 | `NexusVPN-android-x86_64.apk` | 模拟器 |\n'
-            printf '| 🤖 Android AAB | `NexusVPN-android.aab` | Google Play 提交 |\n'
-            printf '| 🍏 iOS 未签名 | `NexusVPN-*-ios-unsigned.ipa` | AltStore / TrollStore |\n'
-            printf '\n## ⚠️ 注意事项\n\n'
-            printf '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」\n'
-            printf '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）\n'
-            printf '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装\n'
-            printf '- **Android**: 需要开启「允许未知来源」\n'
-            printf '\n## 🔧 核心版本\n\n'
-            printf '- sing-box `v%s`\n' "${{ env.SING_BOX_VERSION }}"
-            printf '- Flutter `v%s`\n' "${{ env.FLUTTER_VERSION }}"
-            printf '\n## 📝 更新日志（%s）\n\n' "$RANGE"
-            printf '%s\n' "$COMMITS"
-            printf '\n---\n'
-            printf '*Build `%s` · Commit `%s`*\n' \
-              "${{ needs.version.outputs.build_num }}" \
-              "${GITHUB_SHA::7}"
-            printf 'RELEASE_BODY\n'
-          } >> "$GITHUB_OUTPUT"
+            echo '> 跨平台 VPN 客户端 — VLESS+REALITY · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · WireGuard'
+            echo
+            echo '## 📦 下载'
+            echo
+            echo '| 平台 | 文件 | 说明 |'
+            echo '|------|------|------|'
+            echo '| 🍎 macOS (Apple Silicon + Intel) | `NexusVPN-*-macos.dmg` | 拖入 Applications |'
+            echo '| 🪟 Windows x64 安装包 | `NexusVPN-*-windows-setup.exe` | 含 WinTUN，需管理员 |'
+            echo '| 🪟 Windows x64 便携版 | `NexusVPN-*-windows-portable.zip` | 解压即用 |'
+            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |'
+            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-amd64.deb` | Debian/Ubuntu：`sudo dpkg -i` |'
+            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.rpm` | Fedora/RHEL/openSUSE：`sudo rpm -i` |'
+            echo '| 🤖 Android arm64 | `NexusVPN-android-arm64-v8a.apk` | 主流设备推荐 |'
+            echo '| 🤖 Android armv7 | `NexusVPN-android-armeabi-v7a.apk` | 旧设备 |'
+            echo '| 🤖 Android x86_64 | `NexusVPN-android-x86_64.apk` | 模拟器 |'
+            echo '| 🤖 Android AAB | `NexusVPN-android.aab` | Google Play 提交 |'
+            echo '| 🍏 iOS 未签名 | `NexusVPN-*-ios-unsigned.ipa` | AltStore / TrollStore |'
+            echo
+            echo '## ⚠️ 注意事项'
+            echo
+            echo '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」'
+            echo '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）'
+            echo '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装'
+            echo '- **Android**: 需要开启「允许未知来源」'
+            echo
+            echo '## 🔧 核心版本'
+            echo
+            echo "- sing-box \`v${{ env.SING_BOX_VERSION }}\`"
+            echo "- Flutter \`v${{ env.FLUTTER_VERSION }}\`"
+            echo
+            echo "## 📝 更新日志（${RANGE}）"
+            echo
+            # echo is safe for lines beginning with '-'
+            echo "$COMMITS"
+            echo
+            echo '---'
+            echo "*Build \`${{ needs.version.outputs.build_num }}\` · Commit \`${GITHUB_SHA::7}\`*"
+          } > release-notes.md
+
+          echo "----- release-notes.md -----"
+          cat release-notes.md
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "Nexus VPN v${{ needs.version.outputs.version }}"
+          tag_name: ${{ github.ref_name }}
           draft: false
+          make_latest: true
           prerelease: ${{ contains(needs.version.outputs.version, '-') }}
-          body: ${{ steps.cl.outputs.body }}
-          files: release-assets/**
+          body_path: release-notes.md
+          # Upload every verified package (macOS / Windows / Linux / Android / iOS)
+          files: release-flat/*
           token: ${{ secrets.GITHUB_TOKEN }}
-          fail_on_unmatched_files: false   # iOS .ipa may be absent
+          fail_on_unmatched_files: true
+          generate_release_notes: false
