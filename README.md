@@ -2,7 +2,7 @@
 
 <img src="app/assets/icons/app_icon_512.png" width="128" height="128" alt="Nexus VPN Logo"/>
 
-# Nexus VPN
+# Nexus
 
 **现代跨平台 VPN 客户端** · Apple 设计风格 · sing-box 内核 · Flutter 构建
 

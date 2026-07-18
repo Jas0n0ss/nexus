@@ -479,7 +479,6 @@ jobs:
           Summary: Cross-platform VPN client (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard)
           License: MIT
           URL: https://github.com/Jas0n0ss/nexus
-          BuildArch: x86_64
           AutoReqProv: no
           Requires: gtk3
           %global debug_package %{nil}
@@ -502,8 +501,11 @@ jobs:
           /usr/share/icons/hicolor/512x512/apps/nexus-vpn.png
           EOF
 
-          rpmbuild --define "_topdir ${TOP}" -bb "${TOP}/SPECS/nexus-vpn.spec"
-          cp "${TOP}"/RPMS/x86_64/*.rpm "dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
+          rpmbuild --define "_topdir ${TOP}" --target x86_64 -bb "${TOP}/SPECS/nexus-vpn.spec"
+          # Arch subdirectory name can vary — locate the built rpm robustly
+          RPM_FILE=$(find "${TOP}/RPMS" -name '*.rpm' | head -1)
+          [ -n "$RPM_FILE" ] || { echo "❌ rpmbuild produced no .rpm"; exit 1; }
+          cp "$RPM_FILE" "dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
           echo "✅ $(ls -lh dist/*.rpm)"
 
       - uses: actions/upload-artifact@v4
@@ -541,10 +543,17 @@ jobs:
         shell: pwsh
         working-directory: app
         run: |
-          $backup = "$env:TEMP\nexus-backup\windows\runner"
-          New-Item -ItemType Directory -Force -Path $backup | Out-Null
+          # Back up ALL custom files that live inside windows/ before the
+          # scaffold wipes it: the Inno Setup installer script and the
+          # native channel source. (Run #12 failed because installer/ was
+          # deleted here and never restored — ISCC couldn't find the .iss.)
+          $backup = "$env:TEMP\nexus-backup"
+          New-Item -ItemType Directory -Force -Path "$backup\runner" | Out-Null
+          if (Test-Path "windows\installer") {
+            Copy-Item "windows\installer" "$backup\installer" -Recurse -Force
+          }
           if (Test-Path "windows\runner\vpn_channel.cpp") {
-            Copy-Item "windows\runner\vpn_channel.cpp" $backup -Force
+            Copy-Item "windows\runner\vpn_channel.cpp" "$backup\runner\" -Force
           }
           @('android','ios','macos','windows','linux') | ForEach-Object {
             if (Test-Path $_) { Remove-Item $_ -Recurse -Force }
@@ -555,11 +564,15 @@ jobs:
             --platforms=android,ios,linux,macos,windows `
             --no-pub `
             .
-          if (Test-Path "$backup\vpn_channel.cpp") {
-            Copy-Item "$backup\vpn_channel.cpp" "windows\runner\" -Force
+          # Restore custom files on top of the fresh scaffold
+          if (Test-Path "$backup\installer") {
+            Copy-Item "$backup\installer" "windows\installer" -Recurse -Force
           }
-          Write-Host "✅ Windows scaffold created"
-          Get-ChildItem windows\ | Format-Table Name
+          if (Test-Path "$backup\runner\vpn_channel.cpp") {
+            Copy-Item "$backup\runner\vpn_channel.cpp" "windows\runner\" -Force
+          }
+          Write-Host "✅ Windows scaffold created; installer script restored:"
+          Get-ChildItem windows\installer\ | Format-Table Name
 
       - name: flutter pub get
         working-directory: app
