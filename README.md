@@ -4,192 +4,153 @@
 
 # Nexus
 
-**现代跨平台 VPN 客户端** · Apple 设计风格 · sing-box 内核 · Flutter 构建
+**一套界面，五端可用的现代 VPN 客户端**
+
+基于 [sing-box](https://github.com/SagerNet/sing-box) 内核与 Flutter 构建，把常见代理协议、订阅导入和系统级流量接管收进同一款应用——桌面与移动端共享一致的体验。
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/nexus/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Jas0n0ss/nexus/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Jas0n0ss/nexus?style=flat-square&color=3b82f6)](https://github.com/Jas0n0ss/nexus/releases)
-[![Flutter](https://img.shields.io/badge/Flutter-3.22-02569B?style=flat-square&logo=flutter)](https://flutter.dev)
-[![sing-box](https://img.shields.io/badge/sing--box-1.9.3-orange?style=flat-square)](https://github.com/SagerNet/sing-box)
 [![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey?style=flat-square)](#下载)
 [![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
 
-[**下载**](#下载) · [**快速开始**](#快速开始) · [**协议支持**](#协议支持) · [**项目结构**](STRUCTURE.md) · [**构建**](#构建)
+[**下载**](#下载) · [**快速上手**](#快速上手) · [**功能一览**](#功能一览) · [**项目结构**](STRUCTURE.md)
 
 </div>
 
 ---
 
-## ✨ 功能特性
+## 为什么是 Nexus
 
-### 🔌 多协议支持
+用脚本部署节点不难，难的是客户端：协议多、订阅格式乱、配置容易踩坑，桌面和手机还要各找一套工具。
 
-| 协议 | 传输方式 | 安全层 | 解析入口 |
-|------|---------|--------|---------|
-| **VLESS** | TCP / WebSocket / gRPC | REALITY / TLS | `lib/core/node_parser.dart` |
-| **VMess** | TCP / WebSocket / gRPC | TLS / None | 同上 |
-| **Trojan** | TCP / WebSocket / gRPC | TLS | 同上 |
-| **Shadowsocks** | TCP / UDP | AEAD-2022 / AES-GCM | 同上 |
-| **Hysteria 2** | QUIC | TLS | 同上 |
-| **TUIC v5** | QUIC | TLS | 同上 |
-| **WireGuard** | UDP | 内置加密 | 同上 |
+Nexus 面向这个问题：
 
-### 📥 一键导入（5 大服务端脚本）
+- **一处导入** — 订阅链接、单节点 URI、配置文件，都能直接进应用
+- **自动纠错** — 导入时修复常见不兼容项，减少“连不上再手工改 JSON”
+- **真正跨平台** — macOS / Windows / Linux / iOS / Android 同一套产品逻辑
+- **内核统一** — 底层由 sing-box 承载，协议与分流能力跟上主流生态
 
-支持从以下流行的服务端一键部署脚本直接导入节点配置（识别逻辑见 `lib/models/proxy_node.dart` 的 `NodeSource` 枚举）：
+适合自建节点用户、多协议订阅用户，以及希望桌面端与手机端体验一致的人。
 
-| 服务端脚本 | 导入格式 |
+---
+
+## 功能一览
+
+### 多协议
+
+| 协议 | 传输 | 安全 |
+|------|------|------|
+| **VLESS** | TCP / WebSocket / gRPC | REALITY / TLS |
+| **VMess** | TCP / WebSocket / gRPC | TLS / None |
+| **Trojan** | TCP / WebSocket / gRPC | TLS |
+| **Shadowsocks** | TCP / UDP | AEAD-2022 / AES-GCM |
+| **Hysteria 2** | QUIC | TLS |
+| **TUIC v5** | QUIC | TLS |
+| **WireGuard** | UDP | 内置加密 |
+
+### 一键导入
+
+支持从常见服务端部署脚本产出的订阅与配置直接导入：
+
+| 服务端脚本 | 常见格式 |
 |-----------|---------|
 | [233boy/sing-box](https://github.com/233boy/sing-box) | sing-box JSON / URI |
 | [233boy/Xray](https://github.com/233boy/Xray) | Xray JSON / URI |
-| [233boy/v2ray](https://github.com/233boy/v2ray) | Base64 订阅 / vmess:// |
+| [233boy/v2ray](https://github.com/233boy/v2ray) | Base64 订阅 / `vmess://` |
 | [mack-a/v2ray-agent](https://github.com/mack-a/v2ray-agent) | 多协议订阅 |
 | [yonggekkk/sing-box-yg](https://github.com/yonggekkk/sing-box-yg) | sing-box JSON |
 
-导入方式：**订阅 URL** / **URI 粘贴**（`vless://` `vmess://` `trojan://` `ss://` `hysteria2://` `tuic://` `wg://`）/ **配置文件**（file_picker）。
+导入方式：
 
-### 🔧 自动修复引擎（`lib/core/autofix_engine.dart`）
+- **订阅 URL**
+- **URI 粘贴**（`vless://` `vmess://` `trojan://` `ss://` `hysteria2://` `tuic://` `wg://`）
+- **本地配置文件**
 
-导入节点后自动检测并修复常见配置错误：
+### 自动修复
 
-- VMess `encryption: auto` → `none`（sing-box 兼容）
-- gRPC ALPN 强制 `h2`（避免握手失败）
-- QUIC 协议（Hysteria2 / TUIC）禁用 TCP Mux
-- Trojan / VLESS SNI 缺失自动补全
-- REALITY `fingerprint` 缺失默认 `chrome`
+导入后会尽量自动处理常见配置问题，例如：
+
+- VMess `encryption: auto` → 兼容 sing-box 的取值
+- gRPC ALPN 对齐，降低握手失败
+- Hysteria2 / TUIC 与 TCP Mux 冲突时自动调整
+- Trojan / VLESS 缺失 SNI 时补全
+- REALITY 缺少 fingerprint 时给出合理默认
 - Shadowsocks 2022 密钥格式校验
 
-### 🎨 Apple 风格 UI（`lib/screens/` + `lib/widgets/`）
+### 界面与体验
 
-- 毛玻璃卡片（`glass_card.dart`）
-- 实时速率曲线（fl_chart，`dashboard_screen.dart`）
-- 大圆形连接按钮 + 动画（flutter_animate，`connect_button.dart`）
-- 深色 / 浅色模式跟随系统
-- 桌面端左侧导航（window_manager 管理窗口），移动端底部标签栏（`main_shell.dart`）
+Apple 风格的轻量界面：毛玻璃卡片、大号连接按钮、实时上下行曲线、深色 / 浅色跟随系统。桌面端左侧导航，移动端底部标签栏——同一产品，适配不同形态。
+
+### 分流
+
+连接后可按场景切换：
+
+- **规则分流** — 国内流量直连，并配合广告屏蔽规则
+- **全局代理**
+- **直连**
+
+---
+
+## 它如何工作
+
+对用户来说，路径很短：
+
+```
+导入订阅 / URI → 自动修复 → 选节点测延迟 → 一键连接 → 仪表盘看状态与速率
+```
+
+对系统来说，各平台用合适的方式接管流量：
+
+| 平台 | 流量接管 |
+|------|---------|
+| Android | `VpnService` + sing-box |
+| iOS | Network Extension（Packet Tunnel） |
+| Windows | WinTUN 虚拟网卡 |
+| macOS / Linux | sing-box 内核 + 系统代理 |
+
+更细的模块划分见 [STRUCTURE.md](STRUCTURE.md)；浏览器里可直接打开 [`nexus-vpn-preview.html`](nexus-vpn-preview.html) 预览界面风格。
 
 ---
 
 ## 下载
 
-每次 push 到 `main` 都会构建全平台产物（Actions Artifacts），打 `v*.*.*` tag 自动发布 Release：
+| 平台 | 包类型 | 说明 |
+|------|--------|------|
+| macOS | `.dmg` | 拖入 Applications（Apple Silicon + Intel） |
+| Windows | 安装包 / 便携 ZIP | 安装包含 WinTUN |
+| Linux | AppImage / `.deb` / `.rpm` | 常见发行版可直接用 |
+| Android | 分 ABI 的 APK / AAB | 主流为 `arm64-v8a` |
+| iOS | 未签名 IPA | 需侧载（AltStore / TrollStore 等） |
 
-| 平台 | 文件 | 安装方式 |
-|------|------|---------|
-| 🍎 **macOS** | `NexusVPN-*-macos.dmg` | 拖入 Applications（Apple Silicon + Intel 通用）|
-| 🪟 **Windows** | `NexusVPN-*-windows-setup.exe` | 安装包，含 WinTUN 驱动 |
-| 🪟 **Windows** | `NexusVPN-*-windows-portable.zip` | 便携版，解压即用 |
-| 🐧 **Linux** | `NexusVPN-*-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |
-| 🐧 **Linux** | `NexusVPN-*-linux-amd64.deb` | Debian/Ubuntu：`sudo dpkg -i` |
-| 🐧 **Linux** | `NexusVPN-*-linux-x86_64.rpm` | Fedora/RHEL/openSUSE：`sudo rpm -i` |
-| 🤖 **Android** | `NexusVPN-android-arm64-v8a.apk` | 主流设备（另有 armv7 / x86_64 / AAB）|
-| 🍏 **iOS** | `NexusVPN-*-ios-unsigned.ipa` | AltStore / TrollStore / Sideloadly 侧载 |
-
-→ [最新 Release](https://github.com/Jas0n0ss/nexus/releases/latest) · [CI 构建产物](https://github.com/Jas0n0ss/nexus/actions/workflows/ci.yml)
+正式版本见 [Releases](https://github.com/Jas0n0ss/nexus/releases/latest)。  
+每次推送到 `main` 也会产出全平台构建，可在 [Actions](https://github.com/Jas0n0ss/nexus/actions/workflows/ci.yml) 对应运行的 Artifacts 中下载。
 
 ---
 
-## 快速开始
+## 快速上手
 
-### 1. 导入节点
+1. **导入** — 打开「导入」，粘贴订阅链接或单节点 URI  
+2. **选择** — 在「节点」里测延迟，选延迟最低的节点  
+3. **连接** — 回到仪表盘，点连接按钮  
 
-打开 Nexus VPN → 「导入」页 → 粘贴订阅链接或单节点 URI：
+示例：
 
 ```
-# 订阅链接（233boy / mack-a / yonggekkk 脚本生成的均可）
+# 订阅
 https://your.domain/sub?token=xxx
 
-# 单节点 URI
+# 单节点
 vless://uuid@host:443?encryption=none&security=reality&sni=yahoo.com&fp=chrome&pbk=xxx&type=tcp#节点名
 ```
 
-### 2. 连接
-
-「节点」页选择延迟最低的节点 → 返回仪表盘 → 点击连接按钮。自动修复引擎会在导入时处理常见配置问题。
-
-### 3. 平台集成
-
-| 平台 | TUN 实现 | 位置 |
-|------|---------|------|
-| Android | `VpnService` + sing-box 进程 | `app/android/.../VpnService.kt` |
-| iOS | `NEPacketTunnelProvider` | `app/ios/NexusVPNExtension/` |
-| Windows | WinTUN 虚拟网卡 | `app/windows/runner/vpn_channel.cpp` |
-| macOS / Linux | sing-box 进程 + 系统代理 | `lib/core/singbox_runner.dart` |
-
 ---
 
-## 协议支持
+## 开发者
 
-核心数据流（详见 [STRUCTURE.md](STRUCTURE.md)）：
+本地构建、平台脚手架、sing-box 内核准备与签名配置，见 [app/BUILD.md](app/BUILD.md)。  
+代码目录与职责说明见 [STRUCTURE.md](STRUCTURE.md)。
 
-```
-URI/订阅 → NodeParser 解析 → AutofixEngine 修复 → ConfigGenerator 生成 sing-box JSON
-        → SingboxRunner 启动内核 → 平台 TUN/代理接管流量 → Dashboard 实时图表
-```
-
-分流模式：**规则分流**（中国 IP/域名直连 + 广告屏蔽）/ **全局代理** / **直连**。
-
----
-
-## 构建
-
-### 环境要求
-
-- Flutter 3.22（CI 使用版本，见 `.github/workflows/ci.yml` 的 `FLUTTER_VERSION`）
-- 平台工具链：Xcode 15+（macOS/iOS）· VS 2022 C++（Windows）· JDK 17（Android）· GTK3 dev（Linux）
-
-### 本地构建
-
-```bash
-git clone https://github.com/Jas0n0ss/nexus
-cd nexus/app
-
-# 生成平台脚手架（本仓库只提交自定义源码，脚手架由 flutter create 生成）
-flutter create --org com.nexusvpn --project-name nexus_vpn \
-  --platforms=android,ios,linux,macos,windows --no-pub .
-
-flutter pub get
-
-# 下载 sing-box 内核（以 macOS arm64 为例）
-mkdir -p assets/cores
-curl -fsSL https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-darwin-arm64.tar.gz | tar xz
-mv sing-box-1.9.3-darwin-arm64/sing-box assets/cores/ && chmod +x assets/cores/sing-box
-
-flutter run                      # 调试运行
-flutter build macos --release    # 或 windows / linux / apk / ios
-```
-
-### CI / Release
-
-单一工作流 `.github/workflows/ci.yml` 完成全部工作：
-
-```
-version → lint + test + 4 平台并行构建 → all-builds 门禁 → (tag 时) GitHub Release
-```
-
-```bash
-# 触发 Release：打 tag 即可
-git tag v1.0.0 && git push origin v1.0.0
-```
-
-产物：Android APK×3 + AAB · Linux AppImage + deb + rpm · Windows 安装包 + 便携版 · macOS DMG · iOS 未签名 IPA。
-
-### 签名（可选 Secrets）
-
-| Secret | 用途 |
-|--------|------|
-| `ANDROID_KEYSTORE_BASE64` / `ANDROID_STORE_PASS` / `ANDROID_KEY_PASS` / `ANDROID_KEY_ALIAS` | Android 签名 APK |
-| `IOS_CERTIFICATE_BASE64` / `IOS_CERTIFICATE_PASS` / `IOS_PROVISION_BASE64` | iOS 签名 IPA |
-
-未配置时 CI 构建未签名包（iOS 可侧载，Android 为 debug 签名）。
-
----
-
-## 贡献：添加新协议
-
-1. `lib/models/proxy_node.dart` — `Protocol` 枚举加新值
-2. `lib/core/node_parser.dart` — 添加 URI 解析方法
-3. `lib/core/config_generator.dart` — 添加 sing-box outbound 生成
-4. `lib/core/autofix_engine.dart` — 添加修复规则
-5. `test/` — 补充解析测试
+推送 `v*.*.*` 标签会触发 CI 并创建 GitHub Release。
 
 ---
 
