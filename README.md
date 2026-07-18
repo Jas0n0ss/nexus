@@ -155,7 +155,10 @@ vless://uuid@host:443?encryption=none&security=reality&sni=yahoo.com&fp=chrome&p
 **让 macOS / Windows / iOS / Android 安装包被系统信任**：见 [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)。  
 代码目录与职责说明见 [STRUCTURE.md](STRUCTURE.md)。
 
-推送 `v*.*.*` 标签会触发 CI 并创建 GitHub Release。
+**合并到 `main` 后会自动发版**：CI 全平台构建成功 → 自动递增版本（如 `v0.11.0` → `v0.12.0`）并创建 GitHub Release。  
+仓库只保留最新 **2** 个 Release（删除更旧的 tag/发布）。  
+PR 上的 CI 只会构建产物，**不会**发 Release——需要合并进 `main`。  
+也可手动推送 `v*.*.*` 标签触发发版。
 
 ---
 
