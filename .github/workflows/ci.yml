@@ -136,6 +136,33 @@ jobs:
           channel: stable
           cache: true
 
+      # ── Scaffold Flutter platform files ─────────────────────────────────────
+      # flutter create was never run locally; platform build system files
+      # (build.gradle, AndroidManifest.xml, etc.) are missing from the repo.
+      # We generate them here, then restore our custom native files on top.
+      - name: Scaffold Flutter platform files (Android)
+        working-directory: app
+        run: |
+          set -euo pipefail
+          # Save custom native files (at paths Flutter won't clobber)
+          mkdir -p /tmp/fb/android/app/src/main/kotlin/com/nexusvpn
+          [ -f android/app/src/main/kotlin/com/nexusvpn/VpnService.kt ] && \
+            cp android/app/src/main/kotlin/com/nexusvpn/VpnService.kt \
+               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/ || true
+          # Remove partial platform dirs so flutter create regenerates them fully
+          rm -rf android ios macos windows linux
+          # Generate all platform scaffold files
+          flutter create \
+            --org com.nexusvpn \
+            --project-name nexus_vpn \
+            --platforms=android,ios,linux,macos,windows \
+            --no-pub \
+            .
+          # Restore our custom native files
+          cp -r /tmp/fb/android/. android/ 2>/dev/null || true
+          echo "✅ Android scaffold created"
+          ls android/app/src/main/
+
       - name: flutter pub get
         working-directory: app
         run: flutter pub get
@@ -248,6 +275,21 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      # ── Scaffold Flutter platform files ─────────────────────────────────────
+      - name: Scaffold Flutter platform files (Linux)
+        working-directory: app
+        run: |
+          set -euo pipefail
+          rm -rf android ios macos windows linux
+          flutter create \
+            --org com.nexusvpn \
+            --project-name nexus_vpn \
+            --platforms=android,ios,linux,macos,windows \
+            --no-pub \
+            .
+          echo "✅ Linux scaffold created"
+          ls linux/
 
       - name: flutter pub get
         working-directory: app
@@ -432,6 +474,31 @@ jobs:
           channel: stable
           cache: true
 
+      # ── Scaffold Flutter platform files ─────────────────────────────────────
+      - name: Scaffold Flutter platform files (Windows)
+        shell: pwsh
+        working-directory: app
+        run: |
+          $backup = "$env:TEMP\nexus-backup\windows\runner"
+          New-Item -ItemType Directory -Force -Path $backup | Out-Null
+          if (Test-Path "windows\runner\vpn_channel.cpp") {
+            Copy-Item "windows\runner\vpn_channel.cpp" $backup -Force
+          }
+          @('android','ios','macos','windows','linux') | ForEach-Object {
+            if (Test-Path $_) { Remove-Item $_ -Recurse -Force }
+          }
+          flutter create `
+            --org com.nexusvpn `
+            --project-name nexus_vpn `
+            --platforms=android,ios,linux,macos,windows `
+            --no-pub `
+            .
+          if (Test-Path "$backup\vpn_channel.cpp") {
+            Copy-Item "$backup\vpn_channel.cpp" "windows\runner\" -Force
+          }
+          Write-Host "✅ Windows scaffold created"
+          Get-ChildItem windows\ | Format-Table Name
+
       - name: flutter pub get
         working-directory: app
         run: flutter pub get
@@ -530,6 +597,28 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      # ── Scaffold Flutter platform files ─────────────────────────────────────
+      - name: Scaffold Flutter platform files (macOS + iOS)
+        working-directory: app
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/fb/ios/NexusVPNExtension
+          [ -f ios/NexusVPNExtension/PacketTunnelProvider.swift ] && \
+            cp ios/NexusVPNExtension/PacketTunnelProvider.swift \
+               /tmp/fb/ios/NexusVPNExtension/ || true
+          rm -rf android ios macos windows linux
+          flutter create \
+            --org com.nexusvpn \
+            --project-name nexus_vpn \
+            --platforms=android,ios,linux,macos,windows \
+            --no-pub \
+            .
+          # Restore custom Network Extension file
+          mkdir -p ios/NexusVPNExtension
+          cp -r /tmp/fb/ios/. ios/ 2>/dev/null || true
+          echo "✅ macOS + iOS scaffold created"
+          ls macos/ ios/
 
       - name: flutter pub get
         working-directory: app
