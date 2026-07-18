@@ -173,20 +173,20 @@ jobs:
           BUILD="${{ needs.version.outputs.build_num }}"
           sed -i "s/^version: .*/version: ${VERSION}+${BUILD}/" app/pubspec.yaml
 
-      # ── Keystore (optional — only when secret is configured) ────────────────
-      - name: Setup release keystore
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-        run: |
-          set -euo pipefail
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/android/keystore.jks
-          cat > app/android/key.properties << EOF
-          storePassword=${{ secrets.ANDROID_STORE_PASS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASS }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          storeFile=keystore.jks
-          EOF
+      # # ── Keystore (optional — only when secret is configured) ────────────────
+      # - name: Setup release keystore
+      #   if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      #   env:
+      #     ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      #   run: |
+      #     set -euo pipefail
+      #     echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/android/keystore.jks
+      #     cat > app/android/key.properties << EOF
+      #     storePassword=${{ secrets.ANDROID_STORE_PASS }}
+      #     keyPassword=${{ secrets.ANDROID_KEY_PASS }}
+      #     keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+      #     storeFile=keystore.jks
+      #     EOF
 
       - name: flutter build apk --split-per-abi
         working-directory: app
