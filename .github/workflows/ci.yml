@@ -974,38 +974,71 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
+          TAG_NAME="${{ github.ref_name }}"
+          BUILD_NUM="${{ needs.version.outputs.build_num }}"
+          COMMIT_SHORT="${GITHUB_SHA::7}"
           PREV_TAG=$(git tag --sort=-v:refname | grep -v "^v${VERSION}$" | head -1 || true)
+
+          if [[ "$VERSION" == *-* ]]; then
+            RELEASE_KIND="预发布（pre-release）"
+          else
+            RELEASE_KIND="正式版"
+          fi
 
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log "${PREV_TAG}..HEAD" \
               --pretty=format:"- %s" --no-merges | head -40 || true)
             [ -n "$COMMITS" ] || COMMITS="- No changes listed"
-            RANGE="since \`${PREV_TAG}\`"
+            VERSION_SUMMARY="相对上一标签 \`${PREV_TAG}\` 的变更如下。"
           else
-            COMMITS="- Initial release"
-            RANGE="initial"
+            COMMITS="- 首个公开发布：全平台安装包（macOS / Windows / Linux / Android / iOS）"
+            VERSION_SUMMARY="本仓库的首个版本标签发布。"
           fi
+
+          # Optional annotated-tag message becomes part of the version notes
+          # (lightweight tags have empty contents — that's fine)
+          TAG_MSG=$(git for-each-ref --format='%(contents)' "refs/tags/${TAG_NAME}" 2>/dev/null | sed '/^$/d' || true)
 
           # Write notes to a file for body_path. Do not pipe commit lines through
           # `printf '%s\n' "$COMMITS"` — subjects starting with '-' break printf.
           {
+            echo "# Nexus VPN v${VERSION}"
+            echo
             echo '> 跨平台 VPN 客户端 — VLESS+REALITY · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · WireGuard'
+            echo
+            echo '## 🏷️ 版本说明'
+            echo
+            echo '| 项目 | 内容 |'
+            echo '|------|------|'
+            echo "| **Tag** | \`${TAG_NAME}\` |"
+            echo "| **版本号** | \`${VERSION}\` |"
+            echo "| **类型** | ${RELEASE_KIND} |"
+            echo "| **Build** | \`${BUILD_NUM}\` |"
+            echo "| **Commit** | \`${COMMIT_SHORT}\` |"
+            echo
+            echo "${VERSION_SUMMARY}"
+            if [ -n "${TAG_MSG:-}" ]; then
+              echo
+              echo '### Tag 说明'
+              echo
+              echo "${TAG_MSG}"
+            fi
             echo
             echo '## 📦 下载'
             echo
             echo '| 平台 | 文件 | 说明 |'
             echo '|------|------|------|'
-            echo '| 🍎 macOS (Apple Silicon + Intel) | `NexusVPN-*-macos.dmg` | 拖入 Applications |'
-            echo '| 🪟 Windows x64 安装包 | `NexusVPN-*-windows-setup.exe` | 含 WinTUN，需管理员 |'
-            echo '| 🪟 Windows x64 便携版 | `NexusVPN-*-windows-portable.zip` | 解压即用 |'
-            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.AppImage` | `chmod +x` 后直接运行 |'
-            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-amd64.deb` | Debian/Ubuntu：`sudo dpkg -i` |'
-            echo '| 🐧 Linux x64 | `NexusVPN-*-linux-x86_64.rpm` | Fedora/RHEL/openSUSE：`sudo rpm -i` |'
+            echo "| 🍎 macOS (Apple Silicon + Intel) | \`NexusVPN-${VERSION}-macos.dmg\` | 拖入 Applications |"
+            echo "| 🪟 Windows x64 安装包 | \`NexusVPN-${VERSION}-windows-setup.exe\` | 含 WinTUN，需管理员 |"
+            echo "| 🪟 Windows x64 便携版 | \`NexusVPN-${VERSION}-windows-portable.zip\` | 解压即用 |"
+            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.AppImage\` | \`chmod +x\` 后直接运行 |"
+            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-amd64.deb\` | Debian/Ubuntu：\`sudo dpkg -i\` |"
+            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.rpm\` | Fedora/RHEL/openSUSE：\`sudo rpm -i\` |"
             echo '| 🤖 Android arm64 | `NexusVPN-android-arm64-v8a.apk` | 主流设备推荐 |'
             echo '| 🤖 Android armv7 | `NexusVPN-android-armeabi-v7a.apk` | 旧设备 |'
             echo '| 🤖 Android x86_64 | `NexusVPN-android-x86_64.apk` | 模拟器 |'
             echo '| 🤖 Android AAB | `NexusVPN-android.aab` | Google Play 提交 |'
-            echo '| 🍏 iOS 未签名 | `NexusVPN-*-ios-unsigned.ipa` | AltStore / TrollStore |'
+            echo "| 🍏 iOS 未签名 | \`NexusVPN-${VERSION}-ios-unsigned.ipa\` | AltStore / TrollStore |"
             echo
             echo '## ⚠️ 注意事项'
             echo
@@ -1019,13 +1052,13 @@ jobs:
             echo "- sing-box \`v${{ env.SING_BOX_VERSION }}\`"
             echo "- Flutter \`v${{ env.FLUTTER_VERSION }}\`"
             echo
-            echo "## 📝 更新日志（${RANGE}）"
+            echo "## 📝 更新日志（${TAG_NAME}）"
             echo
             # echo is safe for lines beginning with '-'
             echo "$COMMITS"
             echo
             echo '---'
-            echo "*Build \`${{ needs.version.outputs.build_num }}\` · Commit \`${GITHUB_SHA::7}\`*"
+            echo "*Published from tag \`${TAG_NAME}\` · Build \`${BUILD_NUM}\` · Commit \`${COMMIT_SHORT}\`*"
           } > release-notes.md
 
           echo "----- release-notes.md -----"
