@@ -48,7 +48,9 @@ jobs:
             VERSION="${GITHUB_REF#refs/tags/v}"
             IS_RELEASE=true
           else
-            VERSION="0.0.0-dev+${GITHUB_SHA::7}"
+            # NOTE: '+' is not allowed here — pubspec version becomes
+            # "VERSION+BUILD_NUM" and a second '+' makes it invalid semver.
+            VERSION="0.0.0-dev.${GITHUB_SHA::7}"
             IS_RELEASE=false
           fi
           BUILD_NUM=$(date +%Y%m%d%H%M)
