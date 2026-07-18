@@ -5,7 +5,12 @@ class ShellNav extends ChangeNotifier {
   int index = 0;
 
   void goTo(int i) {
-    if (i == index) return;
+    if (i < 0 || i > 4) return;
+    if (i == index) {
+      // Still notify so listeners can re-focus / scroll import UI.
+      notifyListeners();
+      return;
+    }
     index = i;
     notifyListeners();
   }

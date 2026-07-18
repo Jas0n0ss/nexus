@@ -23,7 +23,7 @@ class NodesScreen extends StatelessWidget {
           child: Column(
             children: [
               Consumer<NodesProvider>(
-                builder: (_, nodes, __) => PageHeader(
+                builder: (ctx, nodes, __) => PageHeader(
                   title: '节点',
                   subtitle: nodes.isEmpty
                       ? '尚未导入'
@@ -36,9 +36,9 @@ class NodesScreen extends StatelessWidget {
                         label: const Text('测速'),
                       ),
                     FilledButton.icon(
-                      onPressed: () => context.read<ShellNav>().openImport(),
+                      onPressed: () => ctx.read<ShellNav>().openImport(),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('导入'),
+                      label: const Text('添加节点'),
                     ),
                   ],
                 ),
@@ -127,7 +127,7 @@ class _List extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () => context.read<ShellNav>().openImport(),
-              child: const Text('去导入'),
+              child: const Text('添加节点'),
             ),
           ],
         ),

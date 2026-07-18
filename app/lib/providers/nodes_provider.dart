@@ -88,11 +88,48 @@ class NodesProvider extends ChangeNotifier {
       } else if (_nodes.isNotEmpty) {
         _selected = _nodes.first;
       }
+
+      // Drop any leftover built-in demo / preset rows from older builds.
+      final before = _nodes.length;
+      _nodes.removeWhere(_isLegacyPresetNode);
+      if (_nodes.length != before) {
+        if (_selected != null && !_nodes.any((n) => n.id == _selected!.id)) {
+          _selected = _nodes.isNotEmpty ? _nodes.first : null;
+        }
+        _saveToHive();
+      }
     } catch (e) {
       debugPrint('nodes load failed: $e');
     }
     // Intentionally NO demo / preset nodes — empty until user imports.
     notifyListeners();
+  }
+
+  /// Known placeholder rows that shipped in early prototypes.
+  static bool _isLegacyPresetNode(ProxyNode n) {
+    const names = {
+      '日本 Tokyo 01',
+      '新加坡 SG-Prime',
+      '美国 Los Angeles',
+      '香港 HK-Ultra',
+      '德国 Frankfurt',
+      '韩国 Seoul 03',
+      '台湾 TW-Speed',
+      '英国 London',
+      '美国 New York',
+      '日本 Osaka 02',
+      '法国 Paris',
+      '澳大利亚 Sydney',
+    };
+    const servers = {
+      '198.51.100.10',
+      '198.51.100.20',
+      '198.51.100.30',
+      '103.218.64.12',
+      '103.100.72.8',
+      '43.153.86.19',
+    };
+    return names.contains(n.name) || servers.contains(n.server);
   }
 
   void setFilterGroup(String g) { _filterGroup = g; notifyListeners(); }

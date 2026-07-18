@@ -104,7 +104,9 @@ class _DesktopShell extends StatelessWidget {
               ],
             ),
           ),
-          Expanded(child: screens[index]),
+          Expanded(
+            child: IndexedStack(index: index, children: screens),
+          ),
         ],
       ),
     );

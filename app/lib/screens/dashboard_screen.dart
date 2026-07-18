@@ -32,7 +32,7 @@ class DashboardScreen extends StatelessWidget {
                   FilledButton.icon(
                     onPressed: () => context.read<ShellNav>().openImport(),
                     icon: const Icon(Icons.add, size: 18),
-                    label: const Text('导入'),
+                    label: const Text('添加节点'),
                   ),
                 ],
               ),
@@ -366,7 +366,7 @@ class _QuickNodes extends StatelessWidget {
             ),
             OutlinedButton(
               onPressed: () => context.read<ShellNav>().openImport(),
-              child: const Text('导入'),
+              child: const Text('添加节点'),
             ),
           ],
         ),
