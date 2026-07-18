@@ -11,6 +11,7 @@
 #include <ws2tcpip.h>
 #include <shlwapi.h>
 #include <string>
+#include <vector>
 #include <memory>
 #include <thread>
 
@@ -110,13 +111,37 @@ void VpnChannel::StartVpn(
         return;
     }
 
-    // 3. Start sing-box process with the config
-    std::string cmd = "sing-box.exe run -c " + configFile;
+    // 3. Resolve sing-box.exe next to this process (or cores\ subfolder)
+    char modulePath[MAX_PATH];
+    GetModuleFileNameA(NULL, modulePath, MAX_PATH);
+    PathRemoveFileSpecA(modulePath);
+    std::string exeDir(modulePath);
+    std::string candidates[] = {
+        exeDir + "\\sing-box.exe",
+        exeDir + "\\cores\\sing-box.exe",
+    };
+    std::string singboxPath;
+    for (const auto& c : candidates) {
+        if (GetFileAttributesA(c.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            singboxPath = c;
+            break;
+        }
+    }
+    if (singboxPath.empty()) {
+        result->Error("PROCESS_ERROR",
+            "sing-box.exe not found next to app or in cores\\");
+        return;
+    }
+
+    std::string cmd = "\"" + singboxPath + "\" run -c \"" + configFile + "\"";
     STARTUPINFOA si = {sizeof(si)};
     PROCESS_INFORMATION pi;
+    // CreateProcess may mutate the command line buffer.
+    std::vector<char> cmdBuf(cmd.begin(), cmd.end());
+    cmdBuf.push_back('\0');
 
-    if (!CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, FALSE,
-        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    if (!CreateProcessA(NULL, cmdBuf.data(), NULL, NULL, FALSE,
+        CREATE_NO_WINDOW, NULL, exeDir.c_str(), &si, &pi)) {
         result->Error("PROCESS_ERROR", "Failed to start sing-box.exe");
         return;
     }
