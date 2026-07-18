@@ -287,8 +287,25 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import glob, subprocess, sys, zipfile
+          import subprocess, sys, zipfile
           from pathlib import Path
+
+          def cert_subject(apk: Path, names: set[str]) -> str:
+              rsa_entries = sorted(
+                  n for n in names
+                  if n.startswith("META-INF/") and n.endswith((".RSA", ".DSA", ".EC"))
+              )
+              if not rsa_entries:
+                  data = apk.read_bytes()
+                  if b"APK Sig Block 42" not in data:
+                      sys.exit(f"❌ {apk.name} appears unsigned")
+                  return "APK Signature Block present (no v1 META-INF cert)"
+              rsa_bytes = subprocess.check_output(["unzip", "-p", str(apk), rsa_entries[0]])
+              out = subprocess.check_output(
+                  ["openssl", "pkcs7", "-inform", "DER", "-print_certs", "-noout"],
+                  input=rsa_bytes,  # binary — do not use text=True
+              ).decode("utf-8", errors="replace")
+              return out
 
           apks = sorted(Path("dist").glob("*.apk"))
           if not apks:
@@ -296,7 +313,6 @@ jobs:
 
           for apk in apks:
               print(f"—— {apk.name} ——")
-              # ZIP integrity
               with zipfile.ZipFile(apk) as zf:
                   bad = zf.testzip()
                   if bad:
@@ -308,46 +324,23 @@ jobs:
                   sys.exit(f"❌ missing classes.dex in {apk}")
               if not any(n.startswith("lib/") and n.endswith(".so") for n in names):
                   sys.exit(f"❌ missing native libs in {apk}")
-              # Must NOT be signed with Android Debug
-              try:
-                  out = subprocess.check_output(
-                      ["openssl", "pkcs7", "-inform", "DER",
-                       "-print_certs", "-noout"],
-                      input=subprocess.check_output(
-                          ["unzip", "-p", str(apk), "META-INF/CERT.RSA"]
-                      ),
-                      stderr=subprocess.STDOUT,
-                      text=True,
-                  )
-              except Exception as e:
-                  # v2/v3-only signing may omit CERT.RSA — try CERT.RSA alternatives
-                  rsa = [n for n in names if n.startswith("META-INF/") and n.endswith(".RSA")]
-                  if not rsa:
-                      print("⚠️  no META-INF/*.RSA (v2+ only?) — checking for APK Sig Block")
-                      data = apk.read_bytes()
-                      if b"APK Sig Block 42" not in data:
-                          sys.exit(f"❌ {apk.name} appears unsigned")
-                      print("✅ has APK Signature Block")
-                      continue
-                  out = subprocess.check_output(
-                      ["openssl", "pkcs7", "-inform", "DER",
-                       "-print_certs", "-noout"],
-                      input=subprocess.check_output(
-                          ["unzip", "-p", str(apk), rsa[0]]
-                      ),
-                      text=True,
-                  )
-              print(out.strip() or "(cert ok)")
-              if "Android Debug" in out:
+
+              subject = cert_subject(apk, names)
+              print(subject.strip() or "(cert ok)")
+              if "Android Debug" in subject:
                   sys.exit(
                       f"❌ {apk.name} is signed with Android Debug cert — "
                       "many phones will refuse to install it"
                   )
+              if "CN=Nexus VPN" not in subject and "APK Signature Block" not in subject:
+                  print("⚠️  cert subject unexpected; continuing if not debug-signed")
               print(f"✅ {apk.name} release-signed & structurally valid")
 
-          aabs = list(Path("dist").glob("*.aab"))
-          if not aabs:
+          if not list(Path("dist").glob("*.aab")):
               sys.exit("❌ missing AAB")
+          # Universal APK must exist for easy sideload
+          if not list(Path("dist").glob("*-android-universal.apk")):
+              sys.exit("❌ missing universal APK")
           print("✅ Android package validation passed")
           PY
 
