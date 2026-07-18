@@ -5,7 +5,9 @@
 ```
 nexus-vpn/
 │
-├── README.md                          # 项目主文档（徽章、协议表、安装指南、快速开始）
+├── README.md                          # English project overview (canonical)
+├── README.zh-CN.md                    # 简体中文版 README
+├── LICENSE                            # MIT
 ├── STRUCTURE.md                       # 本文件：注解版目录结构
 │
 ├── nexus-vpn-preview.html             # 🎨 可交互 Web UI 预览（无需后端，直接浏览器打开）
