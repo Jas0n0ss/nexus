@@ -1028,6 +1028,33 @@ jobs:
         working-directory: app
         run: flutter build macos --release --no-pub
 
+      # Flutter assets land under Frameworks/…/flutter_assets; also place a
+      # sidecar next to the executable so Process.start can always find it.
+      - name: Bundle sing-box sidecar into .app
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find app/build/macos/Build/Products/Release \
+                        -maxdepth 1 -name "*.app" | head -1)
+          [ -n "$APP_PATH" ] || { echo "❌ No .app found"; exit 1; }
+          CORE="app/assets/cores/sing-box"
+          [ -f "$CORE" ] || { echo "❌ missing $CORE"; exit 1; }
+          MACOS_DIR="$APP_PATH/Contents/MacOS"
+          RES_CORES="$APP_PATH/Contents/Resources/cores"
+          cp "$CORE" "$MACOS_DIR/sing-box"
+          chmod +x "$MACOS_DIR/sing-box"
+          mkdir -p "$RES_CORES"
+          cp "$CORE" "$RES_CORES/sing-box"
+          chmod +x "$RES_CORES/sing-box"
+          echo "✅ sidecar: $(ls -lh "$MACOS_DIR/sing-box")"
+          # Assert asset path also present (used by CoreLocator extract fallback)
+          ASSET=$(find "$APP_PATH/Contents/Frameworks" -path '*/assets/cores/sing-box' | head -1 || true)
+          if [ -n "$ASSET" ]; then
+            chmod +x "$ASSET" || true
+            echo "✅ asset: $ASSET"
+          else
+            echo "::warning::flutter_assets cores/sing-box not found (sidecar still present)"
+          fi
+
       - name: Install create-dmg
         run: brew install create-dmg
 

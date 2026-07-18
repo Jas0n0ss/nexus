@@ -231,10 +231,31 @@ class NodesProvider extends ChangeNotifier {
     if (idx < 0) return;
 
     final node = _nodes[idx];
+    // Mark as testing so UI updates immediately.
+    _nodes[idx].latencyMs = null;
+    _nodes[idx].isReachable = null;
+    notifyListeners();
+
+    if (node.server.isEmpty || node.port <= 0) {
+      _nodes[idx].isReachable = false;
+      notifyListeners();
+      return;
+    }
+
     final sw = Stopwatch()..start();
     try {
+      // Resolve host first — raw IP skips DNS; hostnames need lookup.
+      InternetAddress? addr;
+      try {
+        final list = await InternetAddress.lookup(node.server)
+            .timeout(const Duration(seconds: 4));
+        if (list.isNotEmpty) addr = list.first;
+      } catch (_) {
+        // Fall through to Socket.connect with original host.
+      }
+
       final socket = await Socket.connect(
-        node.server,
+        addr ?? node.server,
         node.port,
         timeout: const Duration(seconds: 5),
       );
@@ -242,8 +263,9 @@ class NodesProvider extends ChangeNotifier {
       await socket.close();
       _nodes[idx].latencyMs = sw.elapsedMilliseconds;
       _nodes[idx].isReachable = true;
-    } catch (_) {
+    } catch (e) {
       sw.stop();
+      debugPrint('latency test failed [${node.name}] ${node.server}:${node.port}: $e');
       _nodes[idx].latencyMs = null;
       _nodes[idx].isReachable = false;
     }
@@ -251,10 +273,11 @@ class NodesProvider extends ChangeNotifier {
   }
 
   Future<void> testAll() async {
+    if (_nodes.isEmpty) return;
     // Limit concurrency to avoid flooding
     const batch = 8;
     for (var i = 0; i < _nodes.length; i += batch) {
-      final slice = _nodes.skip(i).take(batch);
+      final slice = _nodes.skip(i).take(batch).toList();
       await Future.wait(slice.map((n) => testLatency(n.id)));
     }
   }

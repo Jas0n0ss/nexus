@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../models/proxy_node.dart';
 import '../providers/settings_provider.dart';
 import 'config_generator.dart';
+import 'core_locator.dart';
 import 'platform_vpn.dart';
 
 class CoreStats {
@@ -76,10 +77,11 @@ class SingboxRunner {
       }
     }
 
-    final binary = await _findBinary();
+    final binary = await CoreLocator().resolve();
     if (binary == null) {
-      final msg = '未找到 sing-box 核心。请确认安装包内含 cores/sing-box，'
-          '或将 sing-box 放到应用目录。配置已生成: ${_configPath}';
+      final msg = '未找到 sing-box 核心。请运行 app/scripts/fetch_singbox.sh '
+          '下载内核，或确认安装包内含 cores/sing-box。'
+          '配置已生成: ${_configPath}';
       _logStream?.add('[ERR] $msg');
       // Only allow fake simulator in explicit debug + flag
       if (kDebugMode &&
@@ -261,38 +263,5 @@ class SingboxRunner {
 
   void _watchNative() {
     // Native path has no Process handle; stats still come from Clash API.
-  }
-
-  Future<String?> _findBinary() async {
-    final exeName = Platform.isWindows ? 'sing-box.exe' : 'sing-box';
-    final support = (await getApplicationSupportDirectory()).path;
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-
-    final candidates = <String>[
-      '$exeDir/$exeName',
-      '$exeDir/cores/$exeName',
-      '$support/cores/$exeName',
-      '$exeDir/data/flutter_assets/assets/cores/$exeName',
-      if (Platform.isMacOS) ...[
-        '/usr/local/bin/sing-box',
-        '/opt/homebrew/bin/sing-box',
-      ],
-      if (Platform.isLinux) ...[
-        '/usr/bin/sing-box',
-        '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
-      ],
-      if (Platform.isWindows) r'C:\Program Files\sing-box\sing-box.exe',
-      // Android extracted asset
-      if (Platform.isAndroid) ...[
-        '$support/cores/sing-box',
-        '/data/data/com.nexusvpn.nexus_vpn/files/cores/sing-box',
-      ],
-    ];
-
-    for (final path in candidates) {
-      final f = File(path);
-      if (await f.exists()) return f.path;
-    }
-    return null;
   }
 }

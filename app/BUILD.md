@@ -21,10 +21,29 @@ flutter pub get
 
 ## 2. Download sing-box Binaries
 
+**Required for connect.** Without a core binary the app shows  
+`未找到 sing-box 核心`. At runtime the client also extracts  
+`assets/cores/sing-box` into Application Support when present.
+
 ```bash
+# From repo root — preferred one-liner (current host platform):
+bash app/scripts/fetch_singbox.sh
+
+# Or pick a platform:
+bash app/scripts/fetch_singbox.sh --platform macos
+bash app/scripts/fetch_singbox.sh --platform linux
+bash app/scripts/fetch_singbox.sh --platform windows
+bash app/scripts/fetch_singbox.sh --platform android
+```
+
+Manual download (equivalent):
+
+```bash
+cd app
 # macOS (arm64 + x64 universal)
 mkdir -p assets/cores
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-darwin-amd64.tar.gz | tar xz
+curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-darwin-arm64.tar.gz | tar xz
 lipo -create -output assets/cores/sing-box \
   sing-box-1.9.3-darwin-amd64/sing-box \
   sing-box-1.9.3-darwin-arm64/sing-box
@@ -33,17 +52,17 @@ lipo -create -output assets/cores/sing-box \
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-ios.tar.gz | tar xz
 cp sing-box-1.9.3-ios/sing-box ios/NexusVPNExtension/sing-box
 
-# Android (arm64-v8a + x86_64)
-for ABI in arm64-v8a x86_64 armeabi-v7a; do
-  curl -L "https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-android-${ABI}.tar.gz" | tar xz
-  mkdir -p android/app/src/main/assets/cores
-  cp "sing-box-1.9.3-android-${ABI}/sing-box" "android/app/src/main/assets/cores/sing-box-${ABI}"
-done
+# Android — note release arch names differ from ABI folders
+mkdir -p android/app/src/main/assets/cores
+curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-android-arm64.tar.gz | tar xz
+cp sing-box-1.9.3-android-arm64/sing-box android/app/src/main/assets/cores/sing-box-arm64-v8a
+# … similarly armv7 → armeabi-v7a, amd64 → x86_64
 
 # Windows
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-windows-amd64.zip -o sb-win.zip
 unzip sb-win.zip
 cp sing-box-1.9.3-windows-amd64/sing-box.exe windows/runner/
+cp windows/runner/sing-box.exe assets/cores/sing-box.exe
 # Also download WinTUN: https://www.wintun.net/
 curl -L https://www.wintun.net/builds/wintun-0.14.1.zip -o wintun.zip
 unzip wintun.zip
