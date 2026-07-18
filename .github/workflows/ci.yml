@@ -53,7 +53,10 @@ jobs:
             VERSION="0.0.0-dev.${GITHUB_SHA::7}"
             IS_RELEASE=false
           fi
-          BUILD_NUM=$(date +%Y%m%d%H%M)
+          # Android versionCode must fit in a signed 32-bit int (< 2147483647).
+          # date +%Y%m%d%H%M (e.g. 202607181423) overflows it — use the
+          # monotonically increasing workflow run number instead.
+          BUILD_NUM="${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION"       >> "$GITHUB_OUTPUT"
           echo "build_num=$BUILD_NUM"   >> "$GITHUB_OUTPUT"
           echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
@@ -468,7 +471,10 @@ jobs:
 # ══════════════════════════════════════════════════════════════════════════════
   build-windows:
     name: Windows (installer + portable)
-    runs-on: windows-latest
+    # windows-latest (2025 image) lacks the VS C++ workload Flutter needs —
+    # CMake fails with "Visual Studio 16 2019 could not find any instance".
+    # windows-2022 ships VS 2022 with Desktop C++ preinstalled.
+    runs-on: windows-2022
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
