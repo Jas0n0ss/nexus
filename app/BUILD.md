@@ -14,8 +14,8 @@
 ## 1. Clone & Install Dependencies
 
 ```bash
-git clone https://github.com/yourorg/nexus-vpn
-cd nexus-vpn/app
+git clone https://github.com/Jas0n0ss/nexus
+cd nexus
 flutter pub get
 ```
 
