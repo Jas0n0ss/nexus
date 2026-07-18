@@ -2,15 +2,15 @@
 # ║  Nexus VPN — CI / Build / Release                                          ║
 # ║                                                                            ║
 # ║  Triggers:                                                                 ║
-# ║    push  → main / develop   : lint + test + all platform builds            ║
-# ║    PR    → main / develop   : lint + test + all platform builds            ║
-# ║    tag   → v*.*.*           : same + GitHub Release upload                 ║
+# ║    push → main     : builds + auto tag/release (no manual tag input)       ║
+# ║    push → develop  : lint + test + platform builds                         ║
+# ║    PR   → main/dev : lint + test + platform builds                         ║
+# ║    tag  → v*.*.*   : rebuild + release (skipped if Release already exists) ║
 # ║                                                                            ║
-# ║  Jobs (in order):                                                          ║
-# ║    version ──┬── lint ───┬── build-android   ─┐                           ║
-# ║              └── test ───┼── build-linux     ─┤── all-builds ── release   ║
-# ║                          ├── build-windows   ─┤                           ║
-# ║                          └── build-macos-ios ─┘                           ║
+# ║  Auto version on main (patch always .0):                                   ║
+# ║    0.10 → 0.11 → … → 0.19 → 1.1 → … → 1.9 → 2.1 → …                     ║
+# ║                                                                            ║
+# ║  Jobs: version → lint/test + builds → all-builds → release(+auto-tag)      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
 
 name: CI / Build / Release
@@ -30,7 +30,7 @@ permissions:
   contents: write   # Required for creating GitHub Releases
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 0. Version — derive version string from tag or commit SHA
+# 0. Version — tag / auto-bump on main / commit SHA for PR & develop
 # ══════════════════════════════════════════════════════════════════════════════
 jobs:
   version:
@@ -40,27 +40,66 @@ jobs:
       version:    ${{ steps.v.outputs.version }}
       build_num:  ${{ steps.v.outputs.build_num }}
       is_release: ${{ steps.v.outputs.is_release }}
+      tag_name:   ${{ steps.v.outputs.tag_name }}
+      skip:       ${{ steps.v.outputs.skip }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
       - name: Derive version
         id: v
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
+          chmod +x .github/scripts/next_version.sh
+          SKIP=false
+          TAG_NAME=""
+
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             VERSION="${GITHUB_REF#refs/tags/v}"
+            TAG_NAME="${GITHUB_REF#refs/tags/}"
             IS_RELEASE=true
+            # Auto-tag from main already published this release — skip rebuild.
+            if gh release view "$TAG_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              echo "ℹ️  Release $TAG_NAME already exists — skipping tag rebuild"
+              SKIP=true
+              IS_RELEASE=false
+            fi
+          elif [[ "$GITHUB_REF" == refs/heads/main && "$GITHUB_EVENT_NAME" == "push" ]]; then
+            # Auto-increment: 0.10→…→0.19→1.1→…→1.9→2.1→…
+            LATEST_TAG=$(git tag -l 'v*.*.*' --sort=-v:refname | head -1 || true)
+            VERSION="$(.github/scripts/next_version.sh "${LATEST_TAG:-}")"
+            TAG_NAME="v${VERSION}"
+            IS_RELEASE=true
+            # Idempotent: if this commit is already tagged, do not release again
+            if git describe --exact-match --tags HEAD >/dev/null 2>&1; then
+              EXISTING=$(git describe --exact-match --tags HEAD)
+              echo "ℹ️  HEAD already tagged as $EXISTING — no new release"
+              VERSION="${EXISTING#v}"
+              TAG_NAME="$EXISTING"
+              IS_RELEASE=false
+              SKIP=true
+            fi
+            echo "📈 latest=${LATEST_TAG:-<none>} → next=$VERSION"
           else
+            # PR / develop: non-release build identifier
             # NOTE: '+' is not allowed here — pubspec version becomes
             # "VERSION+BUILD_NUM" and a second '+' makes it invalid semver.
             VERSION="0.0.0-dev.${GITHUB_SHA::7}"
             IS_RELEASE=false
           fi
+
           # Android versionCode must fit in a signed 32-bit int (< 2147483647).
-          # date +%Y%m%d%H%M (e.g. 202607181423) overflows it — use the
-          # monotonically increasing workflow run number instead.
           BUILD_NUM="${GITHUB_RUN_NUMBER}"
           echo "version=$VERSION"       >> "$GITHUB_OUTPUT"
           echo "build_num=$BUILD_NUM"   >> "$GITHUB_OUTPUT"
           echo "is_release=$IS_RELEASE" >> "$GITHUB_OUTPUT"
-          echo "📦 version=$VERSION  build=$BUILD_NUM  release=$IS_RELEASE"
+          echo "tag_name=$TAG_NAME"     >> "$GITHUB_OUTPUT"
+          echo "skip=$SKIP"             >> "$GITHUB_OUTPUT"
+          echo "📦 version=$VERSION  tag=$TAG_NAME  build=$BUILD_NUM  release=$IS_RELEASE  skip=$SKIP"
 
 # ══════════════════════════════════════════════════════════════════════════════
 # 1. Lint & Format Check
@@ -69,6 +108,7 @@ jobs:
     name: Lint & Format
     runs-on: ubuntu-latest
     needs: version
+    if: needs.version.outputs.skip != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -100,6 +140,7 @@ jobs:
     name: Unit Tests
     runs-on: ubuntu-latest
     needs: version
+    if: needs.version.outputs.skip != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -110,6 +151,9 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
+
+      - name: Version scheme unit test
+        run: bash .github/scripts/next_version_test.sh
 
       - name: flutter pub get
         working-directory: app
@@ -128,6 +172,7 @@ jobs:
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
+    if: needs.version.outputs.skip != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -360,6 +405,7 @@ jobs:
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
+    if: needs.version.outputs.skip != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -653,6 +699,7 @@ jobs:
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
+    if: needs.version.outputs.skip != 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -840,6 +887,7 @@ jobs:
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
+    if: needs.version.outputs.skip != 'true'
     env:
       # secrets context is NOT allowed in step-level `if:` — evaluate it here
       # (job-level env CAN reference secrets) and check env in the step instead
@@ -1060,8 +1108,8 @@ jobs:
   all-builds:
     name: All Builds
     runs-on: ubuntu-latest
-    needs: [lint, test, build-android, build-linux, build-windows, build-macos-ios]
-    if: always()
+    needs: [version, lint, test, build-android, build-linux, build-windows, build-macos-ios]
+    if: always() && needs.version.outputs.skip != 'true'
     steps:
       - name: Evaluate build results
         run: |
@@ -1091,13 +1139,13 @@ jobs:
           [ $FAILED -eq 0 ] || exit 1
 
 # ══════════════════════════════════════════════════════════════════════════════
-# 8. Release — runs ONLY on v*.*.* tags, after all builds succeed
+# 8. Release — auto on main (creates tag) or on manual v*.*.* tags
 # ══════════════════════════════════════════════════════════════════════════════
   release:
     name: GitHub Release
     runs-on: ubuntu-latest
     needs: [version, all-builds]
-    if: startsWith(github.ref, 'refs/tags/v') && needs.all-builds.result == 'success'
+    if: needs.version.outputs.is_release == 'true' && needs.all-builds.result == 'success'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1162,102 +1210,42 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
-          TAG_NAME="${{ github.ref_name }}"
+          TAG_NAME="${{ needs.version.outputs.tag_name }}"
           BUILD_NUM="${{ needs.version.outputs.build_num }}"
           COMMIT_SHORT="${GITHUB_SHA::7}"
-          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^v${VERSION}$" | head -1 || true)
-
-          if [[ "$VERSION" == *-* ]]; then
-            RELEASE_KIND="预发布（pre-release）"
-          else
-            RELEASE_KIND="正式版"
-          fi
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${TAG_NAME}$" | head -1 || true)
 
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log "${PREV_TAG}..HEAD" \
-              --pretty=format:"- %s" --no-merges | head -40 || true)
-            [ -n "$COMMITS" ] || COMMITS="- No changes listed"
-            VERSION_SUMMARY="相对上一标签 \`${PREV_TAG}\` 的变更如下。"
+              --pretty=format:"- %s" --no-merges | head -30 || true)
           else
-            COMMITS="- 首个公开发布：全平台安装包（macOS / Windows / Linux / Android / iOS）"
-            VERSION_SUMMARY="本仓库的首个版本标签发布。"
+            COMMITS=$(git log -10 --pretty=format:"- %s" --no-merges || true)
           fi
+          [ -n "$COMMITS" ] || COMMITS="- (no commits)"
 
-          # Optional annotated-tag message becomes part of the version notes
-          # (lightweight tags have empty contents — that's fine)
-          TAG_MSG=$(git for-each-ref --format='%(contents)' "refs/tags/${TAG_NAME}" 2>/dev/null | sed '/^$/d' || true)
-
-          # Write notes to a file for body_path. Do not pipe commit lines through
-          # `printf '%s\n' "$COMMITS"` — subjects starting with '-' break printf.
+          # Keep notes short: version line + changelog only.
+          # Assets are already listed by GitHub Release — no download table / README fluff.
           {
-            echo "# Nexus VPN v${VERSION}"
+            echo "## ${TAG_NAME}"
             echo
-            echo '> 跨平台 VPN 客户端 — VLESS+REALITY · VMess · Trojan · Shadowsocks · Hysteria2 · TUIC · WireGuard'
+            echo "build \`${BUILD_NUM}\` · \`${COMMIT_SHORT}\`"
             echo
-            echo '## 🏷️ 版本说明'
+            echo "### Changes"
             echo
-            echo '| 项目 | 内容 |'
-            echo '|------|------|'
-            echo "| **Tag** | \`${TAG_NAME}\` |"
-            echo "| **版本号** | \`${VERSION}\` |"
-            echo "| **类型** | ${RELEASE_KIND} |"
-            echo "| **Build** | \`${BUILD_NUM}\` |"
-            echo "| **Commit** | \`${COMMIT_SHORT}\` |"
-            echo
-            echo "${VERSION_SUMMARY}"
-            if [ -n "${TAG_MSG:-}" ]; then
-              echo
-              echo '### Tag 说明'
-              echo
-              echo "${TAG_MSG}"
-            fi
-            echo
-            echo '## 📦 下载'
-            echo
-            echo '| 平台 | 文件 | 说明 |'
-            echo '|------|------|------|'
-            echo "| 🍎 macOS (Apple Silicon + Intel) | \`NexusVPN-${VERSION}-macos.dmg\` | 拖入 Applications |"
-            echo "| 🪟 Windows x64 安装包 | \`NexusVPN-${VERSION}-windows-setup.exe\` | 含 WinTUN，需管理员 |"
-            echo "| 🪟 Windows x64 便携版 | \`NexusVPN-${VERSION}-windows-portable.zip\` | 解压即用 |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.AppImage\` | \`chmod +x\` 后直接运行 |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-amd64.deb\` | Debian/Ubuntu：\`sudo dpkg -i\` |"
-            echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.rpm\` | Fedora/RHEL/openSUSE：\`sudo rpm -i\` |"
-            echo "| 🤖 Android（推荐） | \`NexusVPN-${VERSION}-android-universal.apk\` | 通用包，直接安装 |"
-            echo "| 🤖 Android arm64 | \`NexusVPN-${VERSION}-android-arm64-v8a.apk\` | 主流手机（体积更小） |"
-            echo "| 🤖 Android armv7 | \`NexusVPN-${VERSION}-android-armeabi-v7a.apk\` | 旧设备 |"
-            echo "| 🤖 Android x86_64 | \`NexusVPN-${VERSION}-android-x86_64.apk\` | 模拟器 |"
-            echo "| 🤖 Android AAB | \`NexusVPN-${VERSION}-android-play.aab\` | 仅用于 Google Play 上架，不能直接安装 |"
-            echo "| 🍏 iOS 未签名 | \`NexusVPN-${VERSION}-ios-unsigned.ipa\` | AltStore / TrollStore |"
-            echo
-            echo '## ⚠️ 注意事项'
-            echo
-            echo '- **Android**: 请下载 \`.apk\`（推荐 universal）。\`.aab\` 不能直接安装。需开启「允许未知来源」'
-            echo '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」'
-            echo '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）'
-            echo '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装'
-            echo
-            echo '## 🔧 核心版本'
-            echo
-            echo "- sing-box \`v${{ env.SING_BOX_VERSION }}\`"
-            echo "- Flutter \`v${{ env.FLUTTER_VERSION }}\`"
-            echo
-            echo "## 📝 更新日志（${TAG_NAME}）"
-            echo
-            # echo is safe for lines beginning with '-'
             echo "$COMMITS"
-            echo
-            echo '---'
-            echo "*Published from tag \`${TAG_NAME}\` · Build \`${BUILD_NUM}\` · Commit \`${COMMIT_SHORT}\`*"
           } > release-notes.md
 
           echo "----- release-notes.md -----"
           cat release-notes.md
 
-      - name: Create GitHub Release
+      - name: Create GitHub Release (+ auto tag on main)
         uses: softprops/action-gh-release@v2
         with:
           name: "Nexus VPN v${{ needs.version.outputs.version }}"
-          tag_name: ${{ github.ref_name }}
+          # On main: creates vX.Y.0 tag automatically — no manual `git tag` needed.
+          # On tag push: uses the pushed tag name.
+          tag_name: ${{ needs.version.outputs.tag_name }}
+          target_commitish: ${{ github.sha }}
           draft: false
           make_latest: true
           prerelease: ${{ contains(needs.version.outputs.version, '-') }}
