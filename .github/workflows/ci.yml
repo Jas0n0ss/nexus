@@ -653,6 +653,8 @@ jobs:
     # Builds run in parallel with lint/test so a single CI run surfaces ALL
     # failures at once. The all-builds gate still requires lint+test to pass.
     needs: [version]
+    env:
+      HAS_WINDOWS_CERT: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -742,6 +744,36 @@ jobs:
         working-directory: app
         run: flutter build windows --release --no-pub
 
+      # Authenticode-sign binaries when WINDOWS_CERTIFICATE_* secrets are set.
+      # Without them, SmartScreen will show "Unknown publisher" — see docs/CODE_SIGNING.md.
+      - name: Sign Windows binaries (Authenticode)
+        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $pfx = Join-Path $env:RUNNER_TEMP "nexus-windows.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          Write-Host "Using $signtool"
+          $src = "app/build/windows/x64/runner/Release"
+          # Ensure helper binaries are present before signing the tree
+          Copy-Item "app/windows/runner/sing-box.exe" "$src/" -Force -ErrorAction SilentlyContinue
+          Copy-Item "app/windows/runner/wintun.dll"   "$src/" -Force -ErrorAction SilentlyContinue
+          $targets = Get-ChildItem $src -Include *.exe,*.dll -Recurse | Where-Object { $_.Name -notmatch '^(icudtl)' }
+          foreach ($f in $targets) {
+            & $signtool sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+              /d "Nexus VPN" $f.FullName
+            if ($LASTEXITCODE -ne 0) { throw "signtool failed for $($f.Name)" }
+            Write-Host "✅ signed $($f.Name)"
+          }
+          Remove-Item $pfx -Force
+
       - name: Install Inno Setup 6 (if not preinstalled)
         shell: pwsh
         run: |
@@ -768,6 +800,27 @@ jobs:
             "/O$((Resolve-Path dist).Path)" `
             "app/windows/installer/nexus-vpn.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Sign Windows installer
+        if: ${{ env.HAS_WINDOWS_CERT == 'true' }}
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          $setup = "dist/NexusVPN-$ver-windows-setup.exe"
+          $pfx = Join-Path $env:RUNNER_TEMP "nexus-windows-setup.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+            /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
+            /d "Nexus VPN Setup" $setup
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed for setup.exe" }
+          Remove-Item $pfx -Force
+          Write-Host "✅ signed $setup"
 
       - name: Package portable ZIP
         shell: pwsh
@@ -844,6 +897,7 @@ jobs:
       # secrets context is NOT allowed in step-level `if:` — evaluate it here
       # (job-level env CAN reference secrets) and check env in the step instead
       HAS_IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+      HAS_MACOS_CERT: ${{ secrets.MACOS_CERTIFICATE_BASE64 != '' && secrets.APPLE_API_KEY_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -923,7 +977,34 @@ jobs:
       - name: Install create-dmg
         run: brew install create-dmg
 
-      - name: Package DMG
+      # When MACOS_CERTIFICATE_* + APPLE_API_KEY_* secrets are set: Developer ID
+      # sign (hardened runtime) + notarytool notarize + staple.
+      # Otherwise Gatekeeper will show "Apple could not verify…" — see docs/CODE_SIGNING.md.
+      - name: Sign + notarize macOS DMG (Developer ID)
+        if: ${{ env.HAS_MACOS_CERT == 'true' }}
+        env:
+          MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+          MACOS_SIGNING_IDENTITY: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_API_KEY_BASE64: ${{ secrets.APPLE_API_KEY_BASE64 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
+          mkdir -p dist
+          APP_PATH=$(find app/build/macos/Build/Products/Release \
+                        -maxdepth 1 -name "*.app" | head -1)
+          [ -n "$APP_PATH" ] || { echo "❌ No .app found"; exit 1; }
+          chmod +x app/packaging/macos/sign_and_notarize.sh
+          bash app/packaging/macos/sign_and_notarize.sh \
+            "$APP_PATH" \
+            "dist/NexusVPN-${VERSION}-macos.dmg"
+          echo "✅ $(ls -lh dist/*.dmg)"
+
+      - name: Package unsigned DMG (no Developer ID secrets)
+        if: ${{ env.HAS_MACOS_CERT != 'true' }}
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
@@ -936,7 +1017,8 @@ jobs:
             echo "❌ No .app found in Release folder" && exit 1
           fi
           APP_NAME=$(basename "$APP_PATH")
-          echo "📦 Packaging: $APP_NAME"
+          echo "📦 Packaging UNSIGNED: $APP_NAME"
+          echo "::warning::macOS DMG is unsigned. Gatekeeper will block until Developer ID + notarization secrets are configured. See docs/CODE_SIGNING.md"
 
           create-dmg \
             --volname "Nexus VPN" \
@@ -1232,9 +1314,10 @@ jobs:
             echo '## ⚠️ 注意事项'
             echo
             echo '- **Android**: 请下载 \`.apk\`（推荐 universal）。\`.aab\` 不能直接安装。需开启「允许未知来源」'
-            echo '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」'
-            echo '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）'
+            echo '- **macOS**: 若出现「Apple could not verify…」，说明尚未配置 Developer ID 公证；可右键 → 打开，或见 [CODE_SIGNING.md](https://github.com/Jas0n0ss/nexus/blob/main/docs/CODE_SIGNING.md)'
+            echo '- **Windows**: 未配置 Authenticode 时 SmartScreen 可能提示未知发布者；安装需管理员权限（WinTUN）'
             echo '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装'
+            echo '- **信任签名**：配置各平台证书 Secrets 后，后续 Release 将自动签名/公证 — 见仓库 \`docs/CODE_SIGNING.md\`'
             echo
             echo '## 🔧 核心版本'
             echo
