@@ -587,6 +587,10 @@ jobs:
     name: macOS (.dmg) + iOS (.ipa)
     runs-on: macos-14
     needs: [lint, test, version]
+    env:
+      # secrets context is NOT allowed in step-level `if:` — evaluate it here
+      # (job-level env CAN reference secrets) and check env in the step instead
+      HAS_IOS_CERT: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -705,7 +709,7 @@ jobs:
           cp app/assets/cores/sing-box app/ios/NexusVPNExtension/sing-box
 
       - name: Import iOS certificates (signed build — requires secrets)
-        if: ${{ secrets.IOS_CERTIFICATE_BASE64 != '' }}
+        if: ${{ env.HAS_IOS_CERT == 'true' }}
         env:
           IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
           IOS_CERTIFICATE_PASS:   ${{ secrets.IOS_CERTIFICATE_PASS }}
