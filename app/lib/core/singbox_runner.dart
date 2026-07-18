@@ -87,20 +87,34 @@ class SingboxRunner {
   }
 
   Future<String?> _findBinary() async {
-    // Search standard locations for sing-box binary
-    final candidates = [
-      // macOS
-      '/usr/local/bin/sing-box',
-      '/opt/homebrew/bin/sing-box',
-      // Linux
-      '/usr/bin/sing-box',
-      // bundled in app
-      '${(await getApplicationSupportDirectory()).path}/cores/sing-box',
-      // Windows
-      r'C:\Program Files\sing-box\sing-box.exe',
+    final exeName = Platform.isWindows ? 'sing-box.exe' : 'sing-box';
+    final support = (await getApplicationSupportDirectory()).path;
+
+    // Prefer binaries shipped next to the app executable / in cores/
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+    final candidates = <String>[
+      // Next to the Flutter runner (Windows portable / installed)
+      '$exeDir/$exeName',
+      '$exeDir/cores/$exeName',
+      // Extracted / user-managed
+      '$support/cores/$exeName',
+      // Flutter asset path after copy (desktop bundles)
+      '$exeDir/data/flutter_assets/assets/cores/$exeName',
+      // System installs
+      if (Platform.isMacOS) ...[
+        '/usr/local/bin/sing-box',
+        '/opt/homebrew/bin/sing-box',
+      ],
+      if (Platform.isLinux) ...[
+        '/usr/bin/sing-box',
+        '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
+      ],
+      if (Platform.isWindows) r'C:\Program Files\sing-box\sing-box.exe',
     ];
+
     for (final path in candidates) {
-      if (await File(path).exists()) return path;
+      final f = File(path);
+      if (await f.exists()) return f.path;
     }
     return null;
   }

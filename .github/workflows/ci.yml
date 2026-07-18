@@ -152,28 +152,59 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          # Save custom native files (at paths Flutter won't clobber)
+          # packaging/ survives (outside android/); also backup VpnService
           mkdir -p /tmp/fb/android/app/src/main/kotlin/com/nexusvpn
-          [ -f android/app/src/main/kotlin/com/nexusvpn/VpnService.kt ] && \
+          if [ -f android/app/src/main/kotlin/com/nexusvpn/VpnService.kt ]; then
             cp android/app/src/main/kotlin/com/nexusvpn/VpnService.kt \
-               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/ || true
+               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/
+          elif [ -f packaging/android/VpnService.kt ]; then
+            cp packaging/android/VpnService.kt \
+               /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/
+          fi
           # Remove partial platform dirs so flutter create regenerates them fully
           rm -rf android ios macos windows linux
-          # Generate all platform scaffold files
           flutter create \
             --org com.nexusvpn \
             --project-name nexus_vpn \
             --platforms=android,ios,linux,macos,windows \
             --no-pub \
             .
-          # Restore our custom native files
-          cp -r /tmp/fb/android/. android/ 2>/dev/null || true
-          echo "✅ Android scaffold created"
+          # Restore custom native sources
+          mkdir -p android/app/src/main/kotlin/com/nexusvpn
+          cp -f /tmp/fb/android/app/src/main/kotlin/com/nexusvpn/VpnService.kt \
+                android/app/src/main/kotlin/com/nexusvpn/VpnService.kt
+          # Apply release signing + installable manifest (NOT Android Debug cert)
+          bash packaging/android/apply_release_config.sh
+          echo "✅ Android scaffold + release config applied"
           ls android/app/src/main/
 
       - name: flutter pub get
         working-directory: app
         run: flutter pub get
+
+      # Optional: override community keystore with Play Store secrets when set
+      - name: Override keystore from secrets (optional)
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASS: ${{ secrets.ANDROID_STORE_PASS }}
+          ANDROID_KEY_PASS: ${{ secrets.ANDROID_KEY_PASS }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "Using community release keystore (packaging/android)"
+            exit 0
+          fi
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/android/keystore/nexus-release.p12
+          cat > app/android/key.properties << EOF
+          storePassword=${ANDROID_STORE_PASS}
+          keyPassword=${ANDROID_KEY_PASS}
+          keyAlias=${ANDROID_KEY_ALIAS}
+          storeFile=../keystore/nexus-release.p12
+          EOF
+          # Strip accidental leading spaces from heredoc
+          sed -i 's/^[[:space:]]*//' app/android/key.properties
+          echo "✅ Overrode keystore from GitHub Secrets"
 
       # ── sing-box binaries for all Android ABIs ──────────────────────────────
       # sing-box releases use different arch names than Android ABI names:
@@ -208,20 +239,10 @@ jobs:
           BUILD="${{ needs.version.outputs.build_num }}"
           sed -i "s/^version: .*/version: ${VERSION}+${BUILD}/" app/pubspec.yaml
 
-      # # ── Keystore (optional — only when secret is configured) ────────────────
-      # - name: Setup release keystore
-      #   if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-      #   env:
-      #     ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      #   run: |
-      #     set -euo pipefail
-      #     echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > app/android/keystore.jks
-      #     cat > app/android/key.properties << EOF
-      #     storePassword=${{ secrets.ANDROID_STORE_PASS }}
-      #     keyPassword=${{ secrets.ANDROID_KEY_PASS }}
-      #     keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-      #     storeFile=keystore.jks
-      #     EOF
+      # Universal (fat) APK — easiest for end users to sideload
+      - name: flutter build apk --release (universal)
+        working-directory: app
+        run: flutter build apk --release --no-pub
 
       - name: flutter build apk --split-per-abi
         working-directory: app
@@ -235,19 +256,100 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          # Rename APKs: app-arm64-v8a-release.apk → NexusVPN-android-arm64-v8a.apk
+          VERSION="${{ needs.version.outputs.version }}"
+
+          # Universal APK (recommended download for phones)
+          if [ -f app/build/app/outputs/flutter-apk/app-release.apk ]; then
+            cp app/build/app/outputs/flutter-apk/app-release.apk \
+               "dist/NexusVPN-${VERSION}-android-universal.apk"
+            echo "✅ dist/NexusVPN-${VERSION}-android-universal.apk"
+          fi
+
+          # Per-ABI APKs
           for f in app/build/app/outputs/flutter-apk/app-*-release.apk; do
             [ -f "$f" ] || continue
             name=$(basename "$f")
+            # skip the universal app-release.apk (already copied)
+            [ "$name" = "app-release.apk" ] && continue
             abi="${name#app-}"
             abi="${abi%-release.apk}"
-            cp "$f" "dist/NexusVPN-android-${abi}.apk"
-            echo "✅ dist/NexusVPN-android-${abi}.apk"
+            cp "$f" "dist/NexusVPN-${VERSION}-android-${abi}.apk"
+            echo "✅ dist/NexusVPN-${VERSION}-android-${abi}.apk"
           done
-          # AAB
-          cp app/build/app/outputs/bundle/release/app-release.aab dist/NexusVPN-android.aab
-          echo "✅ dist/NexusVPN-android.aab"
+
+          # AAB is for Play Console only — name it so users don't try to install it
+          cp app/build/app/outputs/bundle/release/app-release.aab \
+             "dist/NexusVPN-${VERSION}-android-play.aab"
+          echo "✅ dist/NexusVPN-${VERSION}-android-play.aab"
           ls -lh dist/
+
+      - name: Validate Android packages (installable)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob, subprocess, sys, zipfile
+          from pathlib import Path
+
+          apks = sorted(Path("dist").glob("*.apk"))
+          if not apks:
+              sys.exit("❌ no APKs in dist/")
+
+          for apk in apks:
+              print(f"—— {apk.name} ——")
+              # ZIP integrity
+              with zipfile.ZipFile(apk) as zf:
+                  bad = zf.testzip()
+                  if bad:
+                      sys.exit(f"❌ corrupt zip entry: {bad}")
+                  names = set(zf.namelist())
+              if "AndroidManifest.xml" not in names:
+                  sys.exit(f"❌ missing AndroidManifest.xml in {apk}")
+              if "classes.dex" not in names:
+                  sys.exit(f"❌ missing classes.dex in {apk}")
+              if not any(n.startswith("lib/") and n.endswith(".so") for n in names):
+                  sys.exit(f"❌ missing native libs in {apk}")
+              # Must NOT be signed with Android Debug
+              try:
+                  out = subprocess.check_output(
+                      ["openssl", "pkcs7", "-inform", "DER",
+                       "-print_certs", "-noout"],
+                      input=subprocess.check_output(
+                          ["unzip", "-p", str(apk), "META-INF/CERT.RSA"]
+                      ),
+                      stderr=subprocess.STDOUT,
+                      text=True,
+                  )
+              except Exception as e:
+                  # v2/v3-only signing may omit CERT.RSA — try CERT.RSA alternatives
+                  rsa = [n for n in names if n.startswith("META-INF/") and n.endswith(".RSA")]
+                  if not rsa:
+                      print("⚠️  no META-INF/*.RSA (v2+ only?) — checking for APK Sig Block")
+                      data = apk.read_bytes()
+                      if b"APK Sig Block 42" not in data:
+                          sys.exit(f"❌ {apk.name} appears unsigned")
+                      print("✅ has APK Signature Block")
+                      continue
+                  out = subprocess.check_output(
+                      ["openssl", "pkcs7", "-inform", "DER",
+                       "-print_certs", "-noout"],
+                      input=subprocess.check_output(
+                          ["unzip", "-p", str(apk), rsa[0]]
+                      ),
+                      text=True,
+                  )
+              print(out.strip() or "(cert ok)")
+              if "Android Debug" in out:
+                  sys.exit(
+                      f"❌ {apk.name} is signed with Android Debug cert — "
+                      "many phones will refuse to install it"
+                  )
+              print(f"✅ {apk.name} release-signed & structurally valid")
+
+          aabs = list(Path("dist").glob("*.aab"))
+          if not aabs:
+              sys.exit("❌ missing AAB")
+          print("✅ Android package validation passed")
+          PY
 
       - uses: actions/upload-artifact@v4
         with:
@@ -369,27 +471,28 @@ jobs:
           cp "$ICON" AppDir/usr/share/icons/hicolor/512x512/apps/nexus-vpn.png
           cp "$ICON" AppDir/nexus-vpn.png   # AppImage root icon
 
-          # Desktop file — must appear at AppDir root (for appimagetool)
-          cat > AppDir/nexus-vpn.desktop << 'DESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=Nexus VPN
-          Exec=nexus_vpn
-          Icon=nexus-vpn
-          Categories=Network;
-          X-AppImage-Name=nexus-vpn
-          DESKTOP
+          # Desktop file — must appear at AppDir root (for appimagetool).
+          # Write without leading spaces (indented heredocs break desktop parsers).
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Nexus VPN' \
+            'Exec=nexus_vpn' \
+            'Icon=nexus-vpn' \
+            'Categories=Network;' \
+            'X-AppImage-Name=nexus-vpn' \
+            > AppDir/nexus-vpn.desktop
           cp AppDir/nexus-vpn.desktop AppDir/usr/share/applications/nexus-vpn.desktop
 
           # AppRun — sets LD_LIBRARY_PATH so Flutter .so files are found
-          cat > AppDir/AppRun << 'APPRUN'
-          #!/bin/sh
-          SELF=$(readlink -f "$0")
-          HERE="${SELF%/*}"
-          export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"
-          export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
-          exec "${HERE}/usr/bin/nexus_vpn" "$@"
-          APPRUN
+          printf '%s\n' \
+            '#!/bin/sh' \
+            'SELF=$(readlink -f "$0")' \
+            'HERE="${SELF%/*}"' \
+            'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"' \
+            'export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"' \
+            'exec "${HERE}/usr/bin/nexus_vpn" "$@"' \
+            > AppDir/AppRun
           chmod +x AppDir/AppRun
 
           # Build AppImage — APPIMAGE_EXTRACT_AND_RUN avoids FUSE requirement on CI
@@ -430,30 +533,30 @@ jobs:
           ICON="app/assets/icons/app_icon_512.png"
           [ -f "$ICON" ] && cp "$ICON" "${DEB}/usr/share/icons/hicolor/512x512/apps/nexus-vpn.png"
 
-          # .desktop
-          cat > "${DEB}/usr/share/applications/nexus-vpn.desktop" << 'DESKTOP'
-          [Desktop Entry]
-          Type=Application
-          Name=Nexus VPN
-          Exec=nexus-vpn
-          Icon=nexus-vpn
-          Categories=Network;
-          DESKTOP
+          # .desktop (no leading whitespace)
+          printf '%s\n' \
+            '[Desktop Entry]' \
+            'Type=Application' \
+            'Name=Nexus VPN' \
+            'Exec=nexus-vpn' \
+            'Icon=nexus-vpn' \
+            'Categories=Network;' \
+            > "${DEB}/usr/share/applications/nexus-vpn.desktop"
 
-          # control — dpkg requires zero leading whitespace on field lines
-          # description continuation line has exactly 1 leading space (dpkg format)
-          cat > "${DEB}/DEBIAN/control" << EOF
-          Package: nexus-vpn
-          Version: ${VERSION}
-          Section: net
-          Priority: optional
-          Architecture: amd64
-          Depends: libgtk-3-0 (>= 3.22), libglib2.0-0, liblzma5
-          Maintainer: Nexus VPN <support@nexusvpn.app>
-          Description: Cross-platform VPN client
-           Supports VLESS+REALITY, VMess, Trojan, Shadowsocks,
-           Hysteria2, TUIC v5, and WireGuard.
-          EOF
+          # control — dpkg requires zero leading whitespace on field lines;
+          # description continuation lines have exactly 1 leading space.
+          {
+            echo "Package: nexus-vpn"
+            echo "Version: ${VERSION}"
+            echo "Section: net"
+            echo "Priority: optional"
+            echo "Architecture: amd64"
+            echo "Depends: libgtk-3-0 (>= 3.22), libglib2.0-0, liblzma5"
+            echo "Maintainer: Nexus VPN <support@nexusvpn.app>"
+            echo "Description: Cross-platform VPN client"
+            echo " Supports VLESS+REALITY, VMess, Trojan, Shadowsocks,"
+            echo " Hysteria2, TUIC v5, and WireGuard."
+          } > "${DEB}/DEBIAN/control"
 
           chmod 755 "${DEB}/DEBIAN"
           fakeroot dpkg-deb --build "${DEB}" "dist/NexusVPN-${VERSION}-linux-amd64.deb"
@@ -507,6 +610,36 @@ jobs:
           [ -n "$RPM_FILE" ] || { echo "❌ rpmbuild produced no .rpm"; exit 1; }
           cp "$RPM_FILE" "dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
           echo "✅ $(ls -lh dist/*.rpm)"
+
+      - name: Validate Linux packages
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
+          AI="dist/NexusVPN-${VERSION}-linux-x86_64.AppImage"
+          DEB="dist/NexusVPN-${VERSION}-linux-amd64.deb"
+          RPM="dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
+
+          # AppImage: ELF + extractable + contains binary
+          file "$AI" | grep -q 'ELF'
+          chmod +x "$AI"
+          rm -rf /tmp/ai-check && mkdir /tmp/ai-check
+          cd /tmp/ai-check && "$GITHUB_WORKSPACE/$AI" --appimage-extract >/dev/null
+          test -x /tmp/ai-check/squashfs-root/usr/bin/nexus_vpn
+          test -f /tmp/ai-check/squashfs-root/usr/lib/libflutter_linux_gtk.so
+          test -f /tmp/ai-check/squashfs-root/usr/bin/data/flutter_assets/AssetManifest.json
+          echo "✅ AppImage structure OK"
+
+          # .deb: control + binary present
+          dpkg-deb -I "$GITHUB_WORKSPACE/$DEB" | grep -q 'Package: nexus-vpn'
+          rm -rf /tmp/deb-check && mkdir /tmp/deb-check
+          dpkg-deb -x "$GITHUB_WORKSPACE/$DEB" /tmp/deb-check
+          test -x /tmp/deb-check/usr/lib/nexus-vpn/nexus_vpn
+          test -x /tmp/deb-check/usr/bin/nexus-vpn
+          echo "✅ deb structure OK"
+
+          # .rpm: file magic + contains payload files
+          file "$GITHUB_WORKSPACE/$RPM" | grep -qi rpm
+          echo "✅ rpm file OK"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -648,13 +781,55 @@ jobs:
         run: |
           $ver = "${{ needs.version.outputs.version }}"
           $src = "app/build/windows/x64/runner/Release"
-          # Bundle sing-box and WinTUN into the portable folder
+          if (-not (Test-Path "$src/nexus_vpn.exe")) {
+            throw "missing nexus_vpn.exe in $src"
+          }
+          if (-not (Test-Path "$src/flutter_windows.dll")) {
+            throw "missing flutter_windows.dll in $src"
+          }
+          if (-not (Test-Path "$src/data/flutter_assets/AssetManifest.json")) {
+            throw "missing Flutter assets in $src"
+          }
+          # Ensure version.json exists (some Flutter builds omit it from zip)
+          $vj = "$src/data/flutter_assets/version.json"
+          if (-not (Test-Path $vj)) {
+            "{`"app_name`":`"nexus_vpn`",`"version`":`"$ver`",`"build_number`":`"0`",`"package_name`":`"com.nexusvpn.nexus_vpn`"}" |
+              Set-Content -Path $vj -Encoding utf8
+          }
+          # Bundle sing-box and WinTUN next to the exe (and under cores/ for lookup)
           Copy-Item "app/windows/runner/sing-box.exe" "$src/" -Force
           Copy-Item "app/windows/runner/wintun.dll"   "$src/" -Force
+          New-Item -ItemType Directory -Force -Path "$src/cores" | Out-Null
+          Copy-Item "app/windows/runner/sing-box.exe" "$src/cores/sing-box.exe" -Force
           Compress-Archive -Path "$src/*" `
             -DestinationPath "dist/NexusVPN-${ver}-windows-portable.zip" -Force
           Write-Host "✅ dist/NexusVPN-${ver}-windows-portable.zip"
           Get-ChildItem dist/ | Format-Table Name, Length
+
+      - name: Validate Windows packages
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          $setup = "dist/NexusVPN-$ver-windows-setup.exe"
+          $zip   = "dist/NexusVPN-$ver-windows-portable.zip"
+          if (-not (Test-Path $setup)) { throw "missing $setup" }
+          if ((Get-Item $setup).Length -lt 1MB) { throw "setup.exe too small" }
+          # Inno Setup PE header
+          $bytes = [System.IO.File]::ReadAllBytes((Resolve-Path $setup).Path)[0..1]
+          if (-not ($bytes[0] -eq 0x4D -and $bytes[1] -eq 0x5A)) { throw "setup.exe is not a PE executable" }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)
+          $names = $archive.Entries | ForEach-Object { $_.FullName }
+          $archive.Dispose()
+          foreach ($need in @("nexus_vpn.exe", "flutter_windows.dll", "wintun.dll", "sing-box.exe", "data/flutter_assets/AssetManifest.json")) {
+            if (-not ($names -contains $need -or ($names | Where-Object { $_ -eq $need -or $_.EndsWith("/$need") }))) {
+              # Zip entries may use backslash
+              if (-not ($names | Where-Object { $_ -replace '\\','/' -eq $need })) {
+                throw "portable zip missing $need (have: $($names -join ', '))"
+              }
+            }
+          }
+          Write-Host "✅ Windows packages validated"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -843,6 +1018,7 @@ jobs:
           if [ -z "$RUNNER_APP" ]; then
             echo "❌ No .app found in iphoneos/" && exit 1
           fi
+          test -x "${RUNNER_APP}/Runner" || test -f "${RUNNER_APP}/Runner"
 
           # IPA = zip of a Payload/ directory containing the .app
           PAYLOAD_DIR="$(mktemp -d)/Payload"
@@ -858,6 +1034,24 @@ jobs:
           echo "⚠️  iOS build did not succeed (outcome: ${{ steps.ios_build.outcome }})."
           echo "    To fix: configure IOS_CERTIFICATE_BASE64 / IOS_PROVISION_BASE64 secrets,"
           echo "    or ensure DEVELOPMENT_TEAM is set in ios/Runner.xcodeproj."
+
+      - name: Validate macOS / iOS packages
+        run: |
+          set -euo pipefail
+          VERSION="${{ needs.version.outputs.version }}"
+          DMG="dist/NexusVPN-${VERSION}-macos.dmg"
+          IPA="dist/NexusVPN-${VERSION}-ios-unsigned.ipa"
+
+          # DMG must exist and be non-trivial
+          test -f "$DMG"
+          SIZE=$(stat -f%z "$DMG" 2>/dev/null || stat -c%s "$DMG")
+          [ "$SIZE" -gt 1000000 ] || { echo "❌ DMG too small ($SIZE)"; exit 1; }
+          echo "✅ macOS DMG OK (${SIZE} bytes)"
+
+          # IPA must contain Payload/*.app/Runner
+          test -f "$IPA"
+          unzip -l "$IPA" | grep -q 'Payload/.*\.app/Runner'
+          echo "✅ iOS IPA structure OK"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -946,10 +1140,11 @@ jobs:
             "NexusVPN-${VERSION}-linux-x86_64.AppImage"
             "NexusVPN-${VERSION}-linux-amd64.deb"
             "NexusVPN-${VERSION}-linux-x86_64.rpm"
-            "NexusVPN-android-arm64-v8a.apk"
-            "NexusVPN-android-armeabi-v7a.apk"
-            "NexusVPN-android-x86_64.apk"
-            "NexusVPN-android.aab"
+            "NexusVPN-${VERSION}-android-universal.apk"
+            "NexusVPN-${VERSION}-android-arm64-v8a.apk"
+            "NexusVPN-${VERSION}-android-armeabi-v7a.apk"
+            "NexusVPN-${VERSION}-android-x86_64.apk"
+            "NexusVPN-${VERSION}-android-play.aab"
             "NexusVPN-${VERSION}-ios-unsigned.ipa"
           )
 
@@ -1034,18 +1229,19 @@ jobs:
             echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.AppImage\` | \`chmod +x\` 后直接运行 |"
             echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-amd64.deb\` | Debian/Ubuntu：\`sudo dpkg -i\` |"
             echo "| 🐧 Linux x64 | \`NexusVPN-${VERSION}-linux-x86_64.rpm\` | Fedora/RHEL/openSUSE：\`sudo rpm -i\` |"
-            echo '| 🤖 Android arm64 | `NexusVPN-android-arm64-v8a.apk` | 主流设备推荐 |'
-            echo '| 🤖 Android armv7 | `NexusVPN-android-armeabi-v7a.apk` | 旧设备 |'
-            echo '| 🤖 Android x86_64 | `NexusVPN-android-x86_64.apk` | 模拟器 |'
-            echo '| 🤖 Android AAB | `NexusVPN-android.aab` | Google Play 提交 |'
+            echo "| 🤖 Android（推荐） | \`NexusVPN-${VERSION}-android-universal.apk\` | 通用包，直接安装 |"
+            echo "| 🤖 Android arm64 | \`NexusVPN-${VERSION}-android-arm64-v8a.apk\` | 主流手机（体积更小） |"
+            echo "| 🤖 Android armv7 | \`NexusVPN-${VERSION}-android-armeabi-v7a.apk\` | 旧设备 |"
+            echo "| 🤖 Android x86_64 | \`NexusVPN-${VERSION}-android-x86_64.apk\` | 模拟器 |"
+            echo "| 🤖 Android AAB | \`NexusVPN-${VERSION}-android-play.aab\` | 仅用于 Google Play 上架，不能直接安装 |"
             echo "| 🍏 iOS 未签名 | \`NexusVPN-${VERSION}-ios-unsigned.ipa\` | AltStore / TrollStore |"
             echo
             echo '## ⚠️ 注意事项'
             echo
+            echo '- **Android**: 请下载 \`.apk\`（推荐 universal）。\`.aab\` 不能直接安装。需开启「允许未知来源」'
             echo '- **macOS**: 首次运行需在「系统设置 → 隐私与安全性」中点击「仍要打开」'
             echo '- **Windows**: 安装程序需要管理员权限（WinTUN 驱动）'
             echo '- **iOS**: 未签名 IPA 需通过 AltStore / TrollStore / Sideloadly 安装'
-            echo '- **Android**: 需要开启「允许未知来源」'
             echo
             echo '## 🔧 核心版本'
             echo
