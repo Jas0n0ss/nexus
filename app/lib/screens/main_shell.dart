@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/shell_nav.dart';
+import '../theme/nexus_theme.dart';
 import 'dashboard_screen.dart';
 import 'nodes_screen.dart';
 import 'import_screen.dart';
@@ -22,27 +23,20 @@ class MainShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nav = context.watch<ShellNav>();
-    final isDesktop = MediaQuery.of(context).size.width > 720;
-    if (isDesktop) {
-      return _DesktopLayout(
-        index: nav.index,
-        onNav: nav.goTo,
-        screens: _screens,
-      );
-    }
-    return _MobileLayout(
-      index: nav.index,
-      onNav: nav.goTo,
-      screens: _screens,
+    final desktop = MediaQuery.of(context).size.width > 720;
+    return NexusAtmosphere(
+      child: desktop
+          ? _DesktopShell(index: nav.index, onNav: nav.goTo, screens: _screens)
+          : _MobileShell(index: nav.index, onNav: nav.goTo, screens: _screens),
     );
   }
 }
 
-class _DesktopLayout extends StatelessWidget {
+class _DesktopShell extends StatelessWidget {
   final int index;
   final ValueChanged<int> onNav;
   final List<Widget> screens;
-  const _DesktopLayout({
+  const _DesktopShell({
     required this.index,
     required this.onNav,
     required this.screens,
@@ -50,55 +44,62 @@ class _DesktopLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: Row(
         children: [
           Container(
-            width: 220,
+            width: 228,
             decoration: BoxDecoration(
-              color: isDark ? const Color(0xFF0A0A12) : const Color(0xFFF7F7FA),
-              border: Border(right: BorderSide(color: cs.onSurface.withOpacity(0.08))),
+              color: (dark ? NexusColors.bgDeep : Colors.white).withOpacity(0.72),
+              border: const Border(right: BorderSide(color: NexusColors.line)),
             ),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const SizedBox(height: 28),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF3B82F6), Color(0xFF6366F1)],
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(10),
+                          gradient: const LinearGradient(
+                            colors: [NexusColors.accent, NexusColors.accentDeep],
+                          ),
                         ),
-                        borderRadius: BorderRadius.circular(8),
+                        child: const Icon(Icons.shield_moon_rounded,
+                            size: 18, color: Color(0xFF042F2E)),
                       ),
-                      child: const Icon(Icons.shield_rounded, color: Colors.white, size: 18),
-                    ),
-                    const SizedBox(width: 10),
-                    Text('Nexus VPN', style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.3,
-                      color: cs.onSurface,
-                    )),
-                  ]),
+                      const SizedBox(width: 10),
+                      Text(
+                        'NEXUS',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              letterSpacing: 1.4,
+                              fontSize: 18,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 24),
-                _navSection(context, '主菜单'),
-                _navItem(context, 0, Icons.language_rounded, '仪表盘'),
-                _navItem(context, 1, Icons.location_on_rounded, '节点列表'),
-                _navItem(context, 2, Icons.upload_file_rounded, '导入配置'),
-                _navItem(context, 3, Icons.article_rounded, '运行日志'),
-                _navItem(context, 4, Icons.settings_rounded, '设置'),
+                const SizedBox(height: 28),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text('导航', style: Theme.of(context).textTheme.labelSmall),
+                ),
+                _NavTile(0, Icons.radar_rounded, '仪表盘', index, onNav),
+                _NavTile(1, Icons.hub_outlined, '节点', index, onNav),
+                _NavTile(2, Icons.file_download_outlined, '导入', index, onNav),
+                _NavTile(3, Icons.terminal_rounded, '日志', index, onNav),
+                _NavTile(4, Icons.tune_rounded, '设置', index, onNav),
                 const Spacer(),
                 Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text('v1.0.0',
-                      style: TextStyle(fontSize: 11, color: cs.onSurface.withOpacity(0.3))),
+                  padding: const EdgeInsets.all(20),
+                  child: Text('v1.0', style: Theme.of(context).textTheme.labelSmall),
                 ),
               ],
             ),
@@ -108,44 +109,53 @@ class _DesktopLayout extends StatelessWidget {
       ),
     );
   }
+}
 
-  Widget _navSection(BuildContext ctx, String label) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 4),
-        child: Text(label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
-              color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.3),
-            )),
-      );
+class _NavTile extends StatelessWidget {
+  final int i;
+  final IconData icon;
+  final String label;
+  final int index;
+  final ValueChanged<int> onNav;
+  const _NavTile(this.i, this.icon, this.label, this.index, this.onNav);
 
-  Widget _navItem(BuildContext ctx, int i, IconData icon, String label) {
+  @override
+  Widget build(BuildContext context) {
     final active = index == i;
-    final cs = Theme.of(ctx).colorScheme;
-    final isDark = Theme.of(ctx).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-      child: Material(
-        color: active
-            ? (isDark ? Colors.white.withOpacity(0.1) : Colors.black.withOpacity(0.06))
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: () => onNav(i),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(children: [
-              Icon(icon, size: 17, color: active ? cs.primary : cs.onSurface.withOpacity(0.5)),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => onNav(i),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          decoration: BoxDecoration(
+            color: active ? NexusColors.accent.withOpacity(0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: active ? NexusColors.accent.withOpacity(0.35) : Colors.transparent,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: active ? NexusColors.accent : NexusColors.textDim,
+              ),
               const SizedBox(width: 10),
-              Text(label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: active ? cs.onSurface : cs.onSurface.withOpacity(0.55),
-                  )),
-            ]),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                  color: active
+                      ? Theme.of(context).colorScheme.onSurface
+                      : NexusColors.textDim,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -153,11 +163,11 @@ class _DesktopLayout extends StatelessWidget {
   }
 }
 
-class _MobileLayout extends StatelessWidget {
+class _MobileShell extends StatelessWidget {
   final int index;
   final ValueChanged<int> onNav;
   final List<Widget> screens;
-  const _MobileLayout({
+  const _MobileShell({
     required this.index,
     required this.onNav,
     required this.screens,
@@ -166,16 +176,17 @@ class _MobileLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: IndexedStack(index: index, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,
         onDestinationSelected: onNav,
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.language_rounded), label: '仪表盘'),
-          NavigationDestination(icon: Icon(Icons.location_on_rounded), label: '节点'),
-          NavigationDestination(icon: Icon(Icons.upload_file_rounded), label: '导入'),
-          NavigationDestination(icon: Icon(Icons.article_rounded), label: '日志'),
-          NavigationDestination(icon: Icon(Icons.settings_rounded), label: '设置'),
+          NavigationDestination(icon: Icon(Icons.radar_rounded), label: '仪表盘'),
+          NavigationDestination(icon: Icon(Icons.hub_outlined), label: '节点'),
+          NavigationDestination(icon: Icon(Icons.file_download_outlined), label: '导入'),
+          NavigationDestination(icon: Icon(Icons.terminal_rounded), label: '日志'),
+          NavigationDestination(icon: Icon(Icons.tune_rounded), label: '设置'),
         ],
       ),
     );

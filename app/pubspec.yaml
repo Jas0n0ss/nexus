@@ -28,6 +28,7 @@ dependencies:
   # UI
   flutter_animate: ^4.5.0
   cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1
 
   # Storage
   shared_preferences: ^2.2.3
