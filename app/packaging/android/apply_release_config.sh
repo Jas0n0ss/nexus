@@ -178,13 +178,28 @@ else
   exit 1
 fi
 
-# Restore VpnService if present in packaging overlay or original path was wiped
-if [ -f "$ROOT/android/app/src/main/kotlin/com/nexusvpn/VpnService.kt" ]; then
-  echo "✅ VpnService.kt present"
-elif [ -f "$PKG/VpnService.kt" ]; then
-  mkdir -p "$ANDROID/app/src/main/kotlin/com/nexusvpn"
+# Restore VpnService / MainActivity overlays after flutter create
+mkdir -p "$ANDROID/app/src/main/kotlin/com/nexusvpn"
+
+if [ -f "$PKG/VpnService.kt" ]; then
   cp -f "$PKG/VpnService.kt" "$ANDROID/app/src/main/kotlin/com/nexusvpn/VpnService.kt"
   echo "✅ restored VpnService.kt from packaging"
+elif [ -f "$ANDROID/app/src/main/kotlin/com/nexusvpn/VpnService.kt" ]; then
+  echo "✅ VpnService.kt present"
+fi
+
+if [ -f "$PKG/MainActivity.kt" ]; then
+  # Prefer packaging MainActivity (MethodChannel bridge); remove default Flutter one if package differs
+  find "$ANDROID/app/src/main/kotlin" -name 'MainActivity.kt' -not -path '*/com/nexusvpn/*' -delete 2>/dev/null || true
+  cp -f "$PKG/MainActivity.kt" "$ANDROID/app/src/main/kotlin/com/nexusvpn/MainActivity.kt"
+  echo "✅ restored MainActivity.kt from packaging"
+fi
+
+# Point AndroidManifest at com.nexusvpn.MainActivity when present
+MANIFEST="$ANDROID/app/src/main/AndroidManifest.xml"
+if [ -f "$MANIFEST" ] && grep -q 'android:name=".MainActivity"' "$MANIFEST"; then
+  sed -i 's/android:name="\.MainActivity"/android:name="com.nexusvpn.MainActivity"/' "$MANIFEST"
+  echo "✅ AndroidManifest MainActivity → com.nexusvpn.MainActivity"
 fi
 
 echo "✅ Android release config applied (release-signed, installable APK)"

@@ -17,6 +17,15 @@ class SettingsProvider extends ChangeNotifier {
   bool crashAutoRestart = true;
   String remoteDns = 'https://1.1.1.1/dns-query';
 
+  // Passwall-like extras
+  bool systemProxy = true;       // set OS proxy when TUN off (desktop)
+  bool allowLan = false;         // listen 0.0.0.0 for LAN devices
+  bool blockAds = true;          // geosite ads → block
+  bool sniffOverride = true;     // sniff_override_destination
+  bool preferIpv4 = true;
+  int mixedPort = 7890;
+  String? lastSubscriptionUrl;
+
   SettingsProvider() { _load(); }
 
   Future<void> _load() async {
@@ -32,6 +41,13 @@ class SettingsProvider extends ChangeNotifier {
     postConnectTest    = p.getBool('postTest') ?? true;
     crashAutoRestart   = p.getBool('crashRestart') ?? true;
     remoteDns          = p.getString('dns') ?? 'https://1.1.1.1/dns-query';
+    systemProxy        = p.getBool('systemProxy') ?? true;
+    allowLan           = p.getBool('allowLan') ?? false;
+    blockAds           = p.getBool('blockAds') ?? true;
+    sniffOverride      = p.getBool('sniffOverride') ?? true;
+    preferIpv4         = p.getBool('preferIpv4') ?? true;
+    mixedPort          = p.getInt('mixedPort') ?? 7890;
+    lastSubscriptionUrl = p.getString('lastSub');
     notifyListeners();
   }
 
@@ -48,6 +64,15 @@ class SettingsProvider extends ChangeNotifier {
     await p.setBool('postTest', postConnectTest);
     await p.setBool('crashRestart', crashAutoRestart);
     await p.setString('dns', remoteDns);
+    await p.setBool('systemProxy', systemProxy);
+    await p.setBool('allowLan', allowLan);
+    await p.setBool('blockAds', blockAds);
+    await p.setBool('sniffOverride', sniffOverride);
+    await p.setBool('preferIpv4', preferIpv4);
+    await p.setInt('mixedPort', mixedPort);
+    if (lastSubscriptionUrl != null) {
+      await p.setString('lastSub', lastSubscriptionUrl!);
+    }
   }
 
   void set(void Function(SettingsProvider s) fn) {

@@ -59,6 +59,26 @@ void VpnChannel::HandleMethodCall(
     else if (method == "getStats") {
         GetStats(std::move(result));
     }
+    else if (method == "setSystemProxy") {
+        auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
+        if (!args) { result->Error("INVALID_ARGS", "Expected map"); return; }
+        const auto& host = std::get<std::string>(args->at(flutter::EncodableValue("host")));
+        int port = 7890;
+        auto portIt = args->find(flutter::EncodableValue("port"));
+        if (portIt != args->end()) {
+            if (std::holds_alternative<int>(portIt->second)) {
+                port = std::get<int>(portIt->second);
+            } else if (std::holds_alternative<int64_t>(portIt->second)) {
+                port = static_cast<int>(std::get<int64_t>(portIt->second));
+            }
+        }
+        SetSystemProxy(host.c_str(), port);
+        result->Success(flutter::EncodableValue(true));
+    }
+    else if (method == "clearSystemProxy") {
+        ClearSystemProxy();
+        result->Success(flutter::EncodableValue(true));
+    }
     else {
         result->NotImplemented();
     }

@@ -7,103 +7,110 @@ class AutoFix {
   AutoFix({required this.nodeId, required this.field, required this.description});
 }
 
+class AutofixResult {
+  final List<ProxyNode> nodes;
+  final List<AutoFix> fixes;
+  AutofixResult({required this.nodes, required this.fixes});
+}
+
 class AutofixEngine {
-  List<AutoFix> fixAll(List<ProxyNode> nodes) {
+  /// Returns corrected nodes (immutable copyWith) plus human-readable fix notes.
+  AutofixResult fixAll(List<ProxyNode> nodes) {
     final fixes = <AutoFix>[];
+    final out = <ProxyNode>[];
     for (final node in nodes) {
-      fixes.addAll(_fixNode(node));
+      final result = _fixNode(node);
+      out.add(result.node);
+      fixes.addAll(result.fixes);
     }
-    return fixes;
+    return AutofixResult(nodes: out, fixes: fixes);
   }
 
-  List<AutoFix> _fixNode(ProxyNode node) {
+  ({ProxyNode node, List<AutoFix> fixes}) _fixNode(ProxyNode node) {
     final fixes = <AutoFix>[];
-    _fixGrpcAlpn(node, fixes);
-    _fixMuxOnQuic(node, fixes);
-    _fixTrojanSni(node, fixes);
-    _fixRealityFingerprint(node, fixes);
-    _fixSs2022Key(node, fixes);
-    _fixVmessZeroAlterId(node, fixes);
-    return fixes;
-  }
+    var n = node;
 
-  /// gRPC transport must use alpn=['h2'] only
-  void _fixGrpcAlpn(ProxyNode node, List<AutoFix> fixes) {
-    if (node.transport != Transport.grpc) return;
-    if (node.alpn != null && node.alpn!.contains('http/1.1') && node.alpn!.contains('h2')) {
-      fixes.add(AutoFix(
-        nodeId: node.id, field: 'alpn',
-        description: '[${node.name}] gRPC ALPN "${node.alpn!.join(",")}" → "h2"（移除 http/1.1 避免握手失败）',
-      ));
-      node.alpn!.remove('http/1.1');
+    if (n.transport == Transport.grpc) {
+      final alpn = n.alpn != null ? List<String>.from(n.alpn!) : <String>[];
+      if (alpn.contains('http/1.1') || alpn.isEmpty) {
+        final next = alpn.where((a) => a != 'http/1.1').toList();
+        if (!next.contains('h2')) next.add('h2');
+        fixes.add(AutoFix(
+          nodeId: n.id,
+          field: 'alpn',
+          description: '[${n.name}] gRPC ALPN → ${next.join(",")}（避免握手失败）',
+        ));
+        n = n.copyWith(alpn: next);
+      }
     }
-  }
 
-  /// QUIC-based protocols (Hysteria2, TUIC) are incompatible with TCP mux
-  void _fixMuxOnQuic(ProxyNode node, List<AutoFix> fixes) {
-    if (![Protocol.hysteria2, Protocol.tuic].contains(node.protocol)) return;
-    // If mux is set in raw config (runtime check only — Dart model doesn't carry mux field)
-    // Record as advisory fix
-    fixes.add(AutoFix(
-      nodeId: node.id, field: 'mux',
-      description: '[${node.name}] QUIC 协议不支持 TCP Mux，确保配置中 mux.enabled = false',
-    ));
-  }
-
-  /// Trojan without explicit SNI will fail behind CDN
-  void _fixTrojanSni(ProxyNode node, List<AutoFix> fixes) {
-    if (node.protocol != Protocol.trojan) return;
-    if (node.sni != null) return;
-    // We can't mutate sni since ProxyNode is const-like — emit advisory
-    fixes.add(AutoFix(
-      nodeId: node.id, field: 'sni',
-      description: '[${node.name}] Trojan SNI 缺失，建议设置 SNI = "${node.server}"',
-    ));
-  }
-
-  /// REALITY requires fingerprint
-  void _fixRealityFingerprint(ProxyNode node, List<AutoFix> fixes) {
-    if (node.security != Security.reality) return;
-    if (node.fingerprint == null) {
+    if ([Protocol.hysteria2, Protocol.tuic].contains(n.protocol)) {
       fixes.add(AutoFix(
-        nodeId: node.id, field: 'fingerprint',
-        description: '[${node.name}] REALITY fingerprint 缺失，已设为默认值 "chrome"',
+        nodeId: n.id,
+        field: 'mux',
+        description: '[${n.name}] QUIC 协议不支持 TCP Mux，已在配置生成时禁用',
       ));
     }
-    if (node.publicKey == null) {
-      fixes.add(AutoFix(
-        nodeId: node.id, field: 'publicKey',
-        description: '[${node.name}] REALITY public_key 缺失，请检查服务端配置',
-      ));
-    }
-  }
 
-  /// Shadowsocks 2022 methods require valid base64 key
-  void _fixSs2022Key(ProxyNode node, List<AutoFix> fixes) {
-    if (node.protocol != Protocol.shadowsocks) return;
-    const methods2022 = ['2022-blake3-aes-128-gcm','2022-blake3-aes-256-gcm','2022-blake3-chacha20-poly1305'];
-    if (!methods2022.contains(node.method)) return;
-    if (node.password == null) return;
-    try {
-      // Validate base64
-      // ignore: deprecated_member_use
-      Uri.decodeComponent(node.password!); // Just a syntax check
-    } catch (_) {
+    if (n.protocol == Protocol.trojan && (n.sni == null || n.sni!.isEmpty)) {
       fixes.add(AutoFix(
-        nodeId: node.id, field: 'password',
-        description: '[${node.name}] 2022 系列加密需要 Base64 密钥，请核实密码格式',
+        nodeId: n.id,
+        field: 'sni',
+        description: '[${n.name}] Trojan SNI 缺失，已设为 ${n.server}',
       ));
+      n = n.copyWith(sni: n.server);
     }
-  }
 
-  /// VMess alter_id should be 0 for AEAD (v2fly 5.x default)
-  void _fixVmessZeroAlterId(ProxyNode node, List<AutoFix> fixes) {
-    if (node.protocol != Protocol.vmess) return;
-    if ((node.alterId ?? 0) > 0) {
+    if (n.security == Security.reality) {
+      if (n.fingerprint == null || n.fingerprint!.isEmpty) {
+        fixes.add(AutoFix(
+          nodeId: n.id,
+          field: 'fingerprint',
+          description: '[${n.name}] REALITY fingerprint 缺失，已设为 chrome',
+        ));
+        n = n.copyWith(fingerprint: 'chrome');
+      }
+      if (n.publicKey == null || n.publicKey!.isEmpty) {
+        fixes.add(AutoFix(
+          nodeId: n.id,
+          field: 'publicKey',
+          description: '[${n.name}] REALITY public_key 缺失，请检查服务端配置',
+        ));
+      }
+    }
+
+    if (n.protocol == Protocol.shadowsocks) {
+      const methods2022 = [
+        '2022-blake3-aes-128-gcm',
+        '2022-blake3-aes-256-gcm',
+        '2022-blake3-chacha20-poly1305',
+      ];
+      if (methods2022.contains(n.method) && (n.password == null || n.password!.isEmpty)) {
+        fixes.add(AutoFix(
+          nodeId: n.id,
+          field: 'password',
+          description: '[${n.name}] 2022 系列加密需要 Base64 密钥，请核实密码',
+        ));
+      }
+    }
+
+    if (n.protocol == Protocol.vmess && (n.alterId ?? 0) > 0) {
       fixes.add(AutoFix(
-        nodeId: node.id, field: 'alterId',
-        description: '[${node.name}] VMess alterId=${node.alterId} 已过时，现代服务端应设为 0（启用 AEAD）',
+        nodeId: n.id,
+        field: 'alterId',
+        description: '[${n.name}] VMess alterId=${n.alterId} 已过时，已改为 0（AEAD）',
+      ));
+      n = n.copyWith(alterId: 0);
+    }
+
+    if (n.server.isEmpty) {
+      fixes.add(AutoFix(
+        nodeId: n.id,
+        field: 'server',
+        description: '[${n.name}] 服务器地址为空，节点不可用',
       ));
     }
+
+    return (node: n, fixes: fixes);
   }
 }
