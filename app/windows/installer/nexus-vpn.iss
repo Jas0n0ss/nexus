@@ -1,4 +1,4 @@
-; Nexus VPN — Inno Setup 6 Installer Script
+; Nexus — Inno Setup 6 Installer Script
 ; Usage: iscc /DAppVersion=1.0.0 nexus-vpn.iss
 ; Paths are relative to this file: app/windows/installer/
 
@@ -6,8 +6,8 @@
   #define AppVersion "0.0.0-dev"
 #endif
 
-#define AppName      "Nexus VPN"
-#define AppPublisher "Nexus VPN Team"
+#define AppName      "Nexus"
+#define AppPublisher "Nexus Team"
 #define AppURL       "https://github.com/Jas0n0ss/nexus"
 #define AppExeName   "nexus_vpn.exe"
 #define AppId        "{{8A3B2F1C-4E5D-6F7A-8B9C-0D1E2F3A4B5C}"
@@ -43,7 +43,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"; Flags: unchecked
-Name: "startuprun";  Description: "Start Nexus VPN at login (tray)"; GroupDescription: "Startup options:"; Flags: unchecked
+Name: "startuprun";  Description: "Start Nexus at login (tray)"; GroupDescription: "Startup options:"; Flags: unchecked
 
 [Files]
 ; Entire Flutter Release bundle (exe + all DLLs + data/)
@@ -67,7 +67,7 @@ function InitializeSetup(): Boolean;
 begin
   if not IsWin64 then
   begin
-    MsgBox('Nexus VPN requires 64-bit Windows 10 or later.', mbError, MB_OK);
+    MsgBox('Nexus requires 64-bit Windows 10 or later.', mbError, MB_OK);
     Result := False;
     Exit;
   end;

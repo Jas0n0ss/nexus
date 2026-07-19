@@ -1,4 +1,4 @@
-// NexusVPN — Android VpnService Implementation
+// Nexus — Android VpnService Implementation
 // Manages the TUN interface, routes traffic through sing-box process.
 // Manifest permissions required:
 //   android.permission.BIND_VPN_SERVICE
@@ -20,11 +20,11 @@ import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
 
-class NexusVpnService : VpnService() {
+class NexusTunnelService : VpnService() {
 
     companion object {
-        private const val TAG = "NexusVPN"
-        private const val CHANNEL_ID = "nexus_vpn_channel"
+        private const val TAG = "Nexus"
+        private const val CHANNEL_ID = "nexus_channel"
         private const val NOTIFICATION_ID = 1
         const val ACTION_START = "com.nexusvpn.START"
         const val ACTION_STOP  = "com.nexusvpn.STOP"
@@ -58,11 +58,11 @@ class NexusVpnService : VpnService() {
         super.onDestroy()
     }
 
-    // ── VPN Start ─────────────────────────────────────────────────────────────
+    // ── Tunnel Start ─────────────────────────────────────────────────────────────
 
     private fun startVpn(configJson: String) {
-        Log.i(TAG, "Starting NexusVPN")
-        showNotification("Nexus VPN 正在连接...", "初始化中")
+        Log.i(TAG, "Starting Nexus")
+        showNotification("Nexus 正在连接...", "初始化中")
 
         scope.launch {
             try {
@@ -77,17 +77,17 @@ class NexusVpnService : VpnService() {
                 startSingbox(configFile, tunFd!!.fd)
 
                 withContext(Dispatchers.Main) {
-                    showNotification("Nexus VPN 已连接", "通过 sing-box 保护")
+                    showNotification("Nexus 已连接", "通过 sing-box 代理")
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "VPN start failed: ${e.message}")
+                Log.e(TAG, "Tunnel start failed: ${e.message}")
                 stopVpn()
             }
         }
     }
 
     private fun stopVpn() {
-        Log.i(TAG, "Stopping NexusVPN")
+        Log.i(TAG, "Stopping Nexus")
         singboxProcess?.destroy()
         singboxProcess = null
         tunFd?.close()
@@ -100,7 +100,7 @@ class NexusVpnService : VpnService() {
 
     private fun buildTun(): ParcelFileDescriptor {
         val builder = Builder()
-            .setSession("Nexus VPN")
+            .setSession("Nexus")
             .addAddress("172.19.0.1", 30)
             .addAddress("fdfe:dcba:9876::1", 126)
             .addRoute("0.0.0.0", 0)
@@ -197,7 +197,7 @@ class NexusVpnService : VpnService() {
             val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             if (mgr.getNotificationChannel(CHANNEL_ID) == null) {
                 mgr.createNotificationChannel(
-                    NotificationChannel(CHANNEL_ID, "Nexus VPN", NotificationManager.IMPORTANCE_LOW)
+                    NotificationChannel(CHANNEL_ID, "Nexus", NotificationManager.IMPORTANCE_LOW)
                 )
             }
         }

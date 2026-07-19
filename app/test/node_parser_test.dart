@@ -1,10 +1,10 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nexus_vpn/core/node_parser.dart';
-import 'package:nexus_vpn/core/config_generator.dart';
-import 'package:nexus_vpn/core/autofix_engine.dart';
-import 'package:nexus_vpn/models/proxy_node.dart';
+import 'package:nexus/core/node_parser.dart';
+import 'package:nexus/core/config_generator.dart';
+import 'package:nexus/core/autofix_engine.dart';
+import 'package:nexus/models/proxy_node.dart';
 void main() {
   group('NodeParser', () {
     final parser = NodeParser();

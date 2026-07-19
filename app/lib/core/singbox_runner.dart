@@ -10,7 +10,7 @@ import '../models/proxy_node.dart';
 import '../providers/settings_provider.dart';
 import 'config_generator.dart';
 import 'core_locator.dart';
-import 'platform_vpn.dart';
+import 'platform_proxy.dart';
 
 class CoreStats {
   final double uploadMbps;
@@ -61,19 +61,19 @@ class SingboxRunner {
     _configPath = configFile.path;
     _logStream?.add('[INFO] 配置已写入 ${_configPath}');
 
-    // Prefer native VPN channel (Windows WinTUN / Android VpnService)
-    if (PlatformVpn.supportsNativeChannel) {
+    // Prefer native tunnel channel (Windows WinTUN / Android VpnService)
+    if (PlatformProxy.supportsNativeChannel) {
       try {
-        final ok = await PlatformVpn.startVpn(configJson);
+        final ok = await PlatformProxy.startTunnel(configJson);
         if (ok) {
           _usingNative = true;
-          _logStream?.add('[OK] 已通过平台 VPN 通道启动');
+          _logStream?.add('[OK] 已通过平台隧道通道启动');
           _watchNative();
           return;
         }
         _logStream?.add('[INFO] 平台通道未接管，回退到本地 sing-box 进程');
       } catch (e) {
-        _logStream?.add('[WARN] 平台 VPN: $e — 尝试本地进程');
+        _logStream?.add('[WARN] 平台隧道: $e — 尝试本地进程');
       }
     }
 
@@ -143,7 +143,7 @@ class SingboxRunner {
     final wantSysProxy = settings?.systemProxy ?? true;
     if (!wantTun && wantSysProxy &&
         (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
-      final ok = await PlatformVpn.setSystemProxy(
+      final ok = await PlatformProxy.setSystemProxy(
         host: '127.0.0.1',
         port: _mixedPort,
       );
@@ -175,12 +175,12 @@ class SingboxRunner {
     _exitWatcher = null;
 
     if (_usingNative) {
-      await PlatformVpn.stopVpn();
+      await PlatformProxy.stopTunnel();
       _usingNative = false;
     }
 
     if (_usingSystemProxy) {
-      await PlatformVpn.clearSystemProxy();
+      await PlatformProxy.clearSystemProxy();
       if (Platform.isWindows) {
         try {
           await Process.run('netsh', ['winhttp', 'reset', 'proxy']);

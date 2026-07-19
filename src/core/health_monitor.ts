@@ -1,5 +1,5 @@
 /**
- * Nexus VPN — Runtime Health Monitor + Auto-Fix Engine
+ * Nexus — Runtime Health Monitor + Auto-Fix Engine
  * Handles: crash detection, DNS leak fix, latency monitoring, auto-restart
  */
 

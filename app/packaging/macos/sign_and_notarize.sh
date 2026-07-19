@@ -73,7 +73,7 @@ echo "📦 Building DMG…"
 VERSION_LABEL="$(basename "$DMG_PATH" .dmg)"
 rm -f "$DMG_PATH"
 create-dmg \
-  --volname "Nexus VPN" \
+  --volname "Nexus" \
   --window-size 540 380 \
   --icon-size 128 \
   --icon "$(basename "$APP_PATH")" 160 190 \

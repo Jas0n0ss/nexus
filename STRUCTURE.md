@@ -1,4 +1,4 @@
-# Nexus VPN — 完整文件目录结构
+# Nexus — 完整文件目录结构
 
 > 每个文件均附有功能说明，帮助新贡献者快速定位代码。
 
@@ -10,7 +10,7 @@ nexus-vpn/
 ├── LICENSE                            # MIT
 ├── STRUCTURE.md                       # 本文件：注解版目录结构
 │
-├── nexus-vpn-preview.html             # 🎨 可交互 Web UI 预览（无需后端，直接浏览器打开）
+├── nexus-preview.html             # 🎨 可交互 Web UI 预览（无需后端，直接浏览器打开）
 │                                      #    Apple 深色毛玻璃风格，Chart.js 实时曲线，12 个 Mock 节点
 │
 ├── architecture.svg                   # 🗺️ 跨平台架构图（SVG）
@@ -72,7 +72,7 @@ nexus-vpn/
     │
     ├── lib/
     │   ├── main.dart                  # 应用入口
-    │   │                              #   MultiProvider 挂载（Settings/Logs/Nodes/VPN）
+    │   │                              #   MultiProvider 挂载（Settings/Logs/Nodes/Session）
     │   │                              #   桌面：window_manager（900×600 最小 / 1100×720 默认）
     │   │                              #   移动：竖屏锁定
     │   │
@@ -88,7 +88,7 @@ nexus-vpn/
     │   │                              #   Singapore Hysteria2 LA VMess HK Trojan…）
     │   │
     │   ├── providers/                 # 状态管理（Provider + ChangeNotifier 模式）
-    │   │   ├── vpn_provider.dart      # VpnProvider — 连接状态机
+    │   │   ├── session_provider.dart      # SessionProvider — 连接状态机
     │   │   │                          #   VpnState: disconnected/connecting/connected/
     │   │   │                          #             disconnecting/error
     │   │   │                          #   connect(node): 启动 singboxRunner / 起 stats 定时器 /
@@ -183,7 +183,7 @@ nexus-vpn/
     │
     ├── android/
     │   └── app/src/main/
-    │       ├── AndroidManifest.xml     # VPN 权限 / 前台服务 / 文件提供者
+    │       ├── AndroidManifest.xml     # 隧道权限 / 前台服务 / 文件提供者
     │       ├── kotlin/com/nexusvpn/
     │       │   ├── MainActivity.kt     # Flutter 主 Activity
     │       │   └── VpnService.kt       # NexusVpnService : VpnService
@@ -266,12 +266,12 @@ nexus-vpn/
          ▼
   SingboxRunner.start()           ← 启动 sing-box 进程
   │    │                             或进入 Simulator 模式
-  │    └─ 平台 VPN 集成
+  │    └─ 平台隧道 集成
   │         ├── iOS/macOS：NEPacketTunnelProvider.startTunnel()
   │         ├── Android：NexusVpnService.buildTun()
   │         └── Windows：vpn_channel.cpp → WinTUN + 系统代理
   │
-  └── VpnProvider stats 定时器（800ms）
+  └── SessionProvider stats 定时器（800ms）
            │ 上传/下载速率
            ▼
       fl_chart LineChart 实时更新
