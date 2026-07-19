@@ -13,6 +13,7 @@ import 'providers/nodes_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/logs_provider.dart';
 import 'providers/shell_nav.dart';
+import 'providers/update_provider.dart';
 import 'core/singbox_runner.dart';
 
 void main() async {
@@ -48,9 +49,18 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => ShellNav()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
+        ChangeNotifierProxyProvider<SettingsProvider, UpdateProvider>(
+          create: (_) => UpdateProvider(),
+          update: (_, settings, updates) {
+            final provider = updates ?? UpdateProvider();
+            provider.configureAutomaticCheck(settings.autoUpdate);
+            return provider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => LogsProvider()),
         ChangeNotifierProvider(create: (_) => NodesProvider()),
-        ChangeNotifierProxyProvider2<NodesProvider, SettingsProvider, SessionProvider>(
+        ChangeNotifierProxyProvider2<NodesProvider, SettingsProvider,
+            SessionProvider>(
           create: (ctx) => SessionProvider(
             singboxRunner: SingboxRunner(),
             logsProvider: ctx.read<LogsProvider>(),

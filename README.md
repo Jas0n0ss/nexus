@@ -33,6 +33,7 @@ Passwall-style automatic failover.
 - **Autofix** — ALPN / SNI / encryption / REALITY defaults on import  
 - **Routing** — rule / global / direct (+ optional ads block)  
 - **HA failover** — probe active node → switch backups → restore primary (Passwall-inspired)  
+- **Online updates** — manual check or automatic GitHub Release checks every 12 hours  
 - **Platforms** — macOS · Windows · Linux · iOS · Android  
 
 Inspired by [OpenWrt Passwall](https://github.com/Openwrt-Passwall/openwrt-passwall) autoswitch logic

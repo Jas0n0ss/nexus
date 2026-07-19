@@ -32,6 +32,7 @@
 - **自动修复** — 导入时纠正 ALPN / SNI / encryption / REALITY 等常见问题  
 - **分流** — 规则 / 全局 / 直连（可选广告屏蔽）  
 - **故障转移** — 探测当前节点 → 切换备用 → 主节点恢复后切回  
+- **在线更新** — 支持手动检查，或每 12 小时自动检查 GitHub Release  
 - **平台** — macOS · Windows · Linux · iOS · Android  
 
 高可用逻辑参考 [OpenWrt Passwall](https://github.com/Openwrt-Passwall/openwrt-passwall)
