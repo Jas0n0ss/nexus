@@ -830,6 +830,37 @@ jobs:
           }
           Remove-Item $pfx -Force
 
+      # Fallback integrity signature. The certificate is local/self-signed, so
+      # Windows still shows Unknown publisher until a public CA cert is set.
+      - name: Sign Windows binaries (generated local certificate)
+        if: ${{ env.HAS_WINDOWS_CERT != 'true' }}
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=Nexus Local Build, O=Nexus" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddDays(30)
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          $src = "app/build/windows/x64/runner/Release"
+          Copy-Item "app/windows/runner/sing-box.exe" "$src/" -Force -ErrorAction SilentlyContinue
+          Copy-Item "app/windows/runner/wintun.dll"   "$src/" -Force -ErrorAction SilentlyContinue
+          $targets = Get-ChildItem $src -Include *.exe,*.dll -Recurse |
+            Where-Object { $_.Name -notmatch '^(icudtl)' }
+          foreach ($f in $targets) {
+            & $signtool sign /sha1 $cert.Thumbprint /s My /fd SHA256 `
+              /d "Nexus Local Build" $f.FullName
+            if ($LASTEXITCODE -ne 0) { throw "local signtool failed for $($f.Name)" }
+            Write-Host "✅ locally signed $($f.Name)"
+          }
+          "WINDOWS_LOCAL_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Warning "Self-signed certificate adds integrity only; SmartScreen still reports Unknown publisher."
+
       - name: Install Inno Setup 6 (if not preinstalled)
         shell: pwsh
         run: |
@@ -877,6 +908,20 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "signtool failed for setup.exe" }
           Remove-Item $pfx -Force
           Write-Host "✅ signed $setup"
+
+      - name: Sign Windows installer (generated local certificate)
+        if: ${{ env.HAS_WINDOWS_CERT != 'true' }}
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          $setup = "dist/Nexus-$ver-windows-setup.exe"
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /sha1 $env:WINDOWS_LOCAL_CERT_THUMBPRINT /s My `
+            /fd SHA256 /d "Nexus Local Setup" $setup
+          if ($LASTEXITCODE -ne 0) { throw "local signtool failed for setup.exe" }
+          Write-Host "✅ locally signed $setup"
 
       - name: Package portable ZIP
         shell: pwsh
@@ -1087,7 +1132,7 @@ jobs:
             "dist/Nexus-${VERSION}-macos.dmg"
           echo "✅ $(ls -lh dist/*.dmg)"
 
-      - name: Package unsigned DMG (no Developer ID secrets)
+      - name: Package locally signed DMG (no Developer ID secrets)
         if: ${{ env.HAS_MACOS_CERT != 'true' }}
         run: |
           set -euo pipefail
@@ -1101,8 +1146,14 @@ jobs:
             echo "❌ No .app found in Release folder" && exit 1
           fi
           APP_NAME=$(basename "$APP_PATH")
-          echo "📦 Packaging UNSIGNED: $APP_NAME"
-          echo "::warning::macOS DMG is unsigned. Gatekeeper will block until Developer ID + notarization secrets are configured. See docs/CODE_SIGNING.md"
+          echo "🔏 Signing with generated local certificate: $APP_NAME"
+          chmod +x app/packaging/macos/sign_local.sh
+          if ! app/packaging/macos/sign_local.sh "$APP_PATH"; then
+            echo "::warning::Local certificate signing failed; falling back to ad-hoc signature"
+            codesign --deep --force --sign - "$APP_PATH"
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          fi
+          echo "::warning::Local/ad-hoc signing is not Apple-trusted. Gatekeeper will still warn until Developer ID + notarization secrets are configured."
 
           create-dmg \
             --volname "Nexus" \
@@ -1114,10 +1165,10 @@ jobs:
             "dist/Nexus-${VERSION}-macos.dmg" \
             "${APP_PATH}" || {
               STATUS=$?
-              # create-dmg exits 2 when no code-signing is configured;
-              # the .dmg is still usable (just unsigned)
+              # create-dmg may exit 2 for a locally signed, non-notarized app;
+              # the .dmg is still usable.
               [ $STATUS -eq 2 ] || exit $STATUS
-              echo "⚠️  create-dmg exited $STATUS (no codesign — DMG is unsigned but valid)"
+              echo "⚠️  create-dmg exited $STATUS (local signature, not notarized)"
             }
           echo "✅ $(ls -lh dist/*.dmg)"
 

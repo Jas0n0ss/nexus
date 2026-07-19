@@ -66,13 +66,29 @@ Requires an OV/EV code-signing certificate from a public CA.
 | `IOS_CERTIFICATE_PASS` | Password |
 | `IOS_PROVISION_BASE64` | `.mobileprovision` |
 
+## Local-certificate fallback
+
+When official Secrets are absent, CI now signs with local identities:
+
+- **Android:** the repository's persistent local release keystore. It must stay
+  stable so a newer APK can update an older installation.
+- **Windows:** a 30-day self-signed code-signing certificate generated for each
+  CI run; binaries and the installer carry an Authenticode integrity signature.
+- **macOS:** a 30-day local code-signing certificate generated in a temporary
+  keychain; if that fails, CI falls back to ad-hoc signing.
+- **iOS:** remains unsigned; arbitrary self-signed certificates cannot create an
+  installable IPA on normal devices without provisioning.
+
+Local certificates are intentionally **not uploaded as Secrets**: they have no
+public trust value. Official certificates in Secrets always take precedence.
+
 ## What CI does today
 
 | Platform | Without secrets | With secrets |
 |----------|-----------------|--------------|
-| Android | Community-signed APK | Your keystore |
-| macOS | Unsigned DMG (Gatekeeper warn) | Sign + notarize |
-| Windows | Unsigned setup/portable | Authenticode sign |
+| Android | Persistent local-keystore APK | Your keystore |
+| macOS | Locally/ad-hoc signed DMG (Gatekeeper warn) | Sign + notarize |
+| Windows | Self-signed setup/portable (Unknown publisher) | CA Authenticode sign |
 | Linux | No OS trust gate | Optional GPG later |
 | iOS | Unsigned IPA (sideload) | Signed IPA |
 

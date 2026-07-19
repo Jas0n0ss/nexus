@@ -2,8 +2,9 @@
 
 > 你在 Mac 上看到的  
 > **「Apple could not verify “nexus_vpn.app” is free of malware…」**  
-> 是 **Gatekeeper**：当前 Release 里的 macOS 包**没有**用 Apple **Developer ID** 签名，也**没有**公证（notarize）。  
-> 这不是应用坏了，而是系统对「未签名分发」的默认拦截。
+> 是 **Gatekeeper**：无官方 Secrets 时，Release 仅使用 CI 自动生成的
+> **本地代码签名证书**，没有 Apple **Developer ID** 信任链，也没有公证
+>（notarize）。这不是应用损坏，而是系统不信任本地签名发布者。
 
 要让各平台安装包被系统默认信任，必须使用**各平台官方颁发的付费/商用证书**，并在 CI 里完成签名（以及 macOS 公证）。  
 本仓库 CI 已支持：配置好 GitHub Secrets 后，打 `v*.*.*` tag 会自动产出受信任包。
@@ -14,8 +15,8 @@
 
 | 平台 | 现在（无 Secrets） | 目标（配置 Secrets 后） | 用户侧效果 |
 |------|-------------------|-------------------------|-----------|
-| **macOS** | 未签名 DMG | Developer ID 签名 + **公证** | 双击即可打开，无 Gatekeeper 警告 |
-| **Windows** | 未 Authenticode 签名 | EV/OV 代码签名 | SmartScreen 不再「未知发布者」 |
+| **macOS** | 本地证书 / ad-hoc 签名 DMG | Developer ID 签名 + **公证** | 双击即可打开，无 Gatekeeper 警告 |
+| **Windows** | 自动生成的自签 Authenticode | EV/OV 代码签名 | SmartScreen 不再「未知发布者」 |
 | **Android** | 社区 release 证书（可安装） | 同上，或换成你自己的 Play 密钥 | 可安装；上架需 Play Console |
 | **iOS** | 未签名 IPA（侧载） | Apple 开发者证书 + 描述文件 | TestFlight / 企业分发 / App Store |
 | **Linux** | 无系统级「签名信任」门槛 | 可选 GPG 签名 deb/rpm | 一般直接运行即可 |
