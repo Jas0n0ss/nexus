@@ -52,6 +52,10 @@ cp wintun/bin/amd64/wintun.dll windows/runner/
 
 ## 3. macOS Build
 
+> 分发给其他 Mac 用户并消除 Gatekeeper「Apple could not verify…」提示，  
+> 必须使用 **Developer ID Application** 签名并 **公证**。  
+> 步骤与 GitHub Secrets 列表见 [`docs/CODE_SIGNING.md`](../docs/CODE_SIGNING.md)。
+
 ```bash
 # Open Xcode project and configure signing
 open macos/Runner.xcworkspace

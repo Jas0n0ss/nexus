@@ -19,12 +19,16 @@ dependencies:
   # Networking
   http: ^1.2.1
 
+  # Config formats
+  yaml: ^3.1.2
+
   # Charts
   fl_chart: ^0.68.0
 
   # UI
   flutter_animate: ^4.5.0
   cupertino_icons: ^1.0.6
+  google_fonts: ^6.2.1
 
   # Storage
   shared_preferences: ^2.2.3

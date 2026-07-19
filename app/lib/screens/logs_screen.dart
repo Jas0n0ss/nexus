@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import '../providers/logs_provider.dart';
+import '../theme/nexus_theme.dart';
+import '../widgets/nexus_surface.dart';
+import '../widgets/page_header.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
-  @override State<LogsScreen> createState() => _LogsScreenState();
+  @override
+  State<LogsScreen> createState() => _LogsScreenState();
 }
 
 class _LogsScreenState extends State<LogsScreen> {
@@ -13,7 +18,10 @@ class _LogsScreenState extends State<LogsScreen> {
   final _scrollCtrl = ScrollController();
 
   @override
-  void dispose() { _scrollCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _scrollCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,69 +37,57 @@ class _LogsScreenState extends State<LogsScreen> {
     }
 
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
-              Row(children: [
-                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('运行日志', style: Theme.of(context).textTheme.displayLarge),
-                  Text('sing-box 内核实时输出', style: Theme.of(context).textTheme.bodySmall),
-                ])),
-                OutlinedButton.icon(
-                  onPressed: logs.clear,
-                  icon: const Icon(Icons.delete_outline_rounded, size: 16),
-                  label: const Text('清空'),
-                ),
-                const SizedBox(width: 8),
-                OutlinedButton.icon(
-                  onPressed: () {/* export */},
-                  icon: const Icon(Icons.save_alt_rounded, size: 16),
-                  label: const Text('导出'),
-                ),
-              ]),
-              const SizedBox(height: 16),
-              // Toolbar
-              Row(children: [
-                _FilterChip('ALL',   _filter, () => setState(() => _filter = 'ALL')),
-                const SizedBox(width: 6),
-                _FilterChip('INFO',  _filter, () => setState(() => _filter = 'INFO')),
-                const SizedBox(width: 6),
-                _FilterChip('WARN',  _filter, () => setState(() => _filter = 'WARN')),
-                const SizedBox(width: 6),
-                _FilterChip('ERROR', _filter, () => setState(() => _filter = 'ERROR')),
-                const Spacer(),
-                Row(children: [
+              PageHeader(
+                title: '日志',
+                subtitle: '核心实时输出',
+                actions: [
+                  OutlinedButton(
+                    onPressed: logs.clear,
+                    child: const Text('清空'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  for (final f in const ['ALL', 'INFO', 'WARN', 'ERROR']) ...[
+                    _Chip(
+                      label: f,
+                      active: _filter == f,
+                      onTap: () => setState(() => _filter = f),
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  const Spacer(),
+                  Text('自动滚动', style: Theme.of(context).textTheme.bodySmall),
                   Switch(
                     value: _autoScroll,
                     onChanged: (v) => setState(() => _autoScroll = v),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  const SizedBox(width: 4),
-                  Text('自动滚动', style: TextStyle(fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurface.withOpacity(0.55))),
-                ]),
-              ]),
+                ],
+              ),
               const SizedBox(height: 12),
-              // Log area
               Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
-                    border: Border.all(color: Theme.of(context).colorScheme.onSurface.withOpacity(0.1)),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                child: NexusSurface(
                   padding: const EdgeInsets.all(14),
                   child: filtered.isEmpty
-                    ? const Center(child: Text('暂无日志', style: TextStyle(color: Colors.grey)))
-                    : ListView.builder(
-                        controller: _scrollCtrl,
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) => _LogLine(filtered[i]),
-                      ),
+                      ? Center(
+                          child: Text('暂无日志',
+                              style: Theme.of(context).textTheme.bodySmall),
+                        )
+                      : ListView.builder(
+                          controller: _scrollCtrl,
+                          itemCount: filtered.length,
+                          itemBuilder: (_, i) => _Line(filtered[i]),
+                        ),
                 ),
               ),
             ],
@@ -102,57 +98,81 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String level, current;
+class _Chip extends StatelessWidget {
+  final String label;
+  final bool active;
   final VoidCallback onTap;
-  const _FilterChip(this.level, this.current, this.onTap);
+  const _Chip({required this.label, required this.active, required this.onTap});
+
   @override
-  Widget build(BuildContext ctx) {
-    final active = level == current;
-    return GestureDetector(
+  Widget build(BuildContext context) {
+    return InkWell(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? Theme.of(ctx).colorScheme.onSurface.withOpacity(0.12) : Colors.transparent,
-          border: Border.all(color: Theme.of(ctx).colorScheme.onSurface.withOpacity(active ? 0.2 : 0.08)),
-          borderRadius: BorderRadius.circular(6),
+          color: active ? NexusColors.accent.withOpacity(0.14) : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: active ? NexusColors.accent.withOpacity(0.4) : NexusColors.line,
+          ),
         ),
-        child: Text(level, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-          color: active ? Theme.of(ctx).colorScheme.onSurface : Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4))),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: active ? NexusColors.accent : NexusColors.textDim,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _LogLine extends StatelessWidget {
+class _Line extends StatelessWidget {
   final LogEntry entry;
-  const _LogLine(this.entry);
+  const _Line(this.entry);
 
-  Color _levelColor(String level) {
+  Color _color(String level) {
     switch (level) {
-      case 'OK':    return const Color(0xFF22C55E);
-      case 'WARN':  return const Color(0xFFF59E0B);
-      case 'ERROR': return const Color(0xFFEF4444);
-      default:      return const Color(0xFF3B82F6);
+      case 'OK':
+        return NexusColors.ok;
+      case 'WARN':
+        return NexusColors.warn;
+      case 'ERROR':
+        return NexusColors.danger;
+      default:
+        return NexusColors.accent;
     }
   }
 
   @override
-  Widget build(BuildContext ctx) => Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
-    child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(entry.timeStr,
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFF6B7280))),
-      const SizedBox(width: 12),
-      SizedBox(width: 42,
-        child: Text(entry.level,
-          style: TextStyle(fontFamily: 'monospace', fontSize: 11,
-            fontWeight: FontWeight.w700, color: _levelColor(entry.level)))),
-      const SizedBox(width: 8),
-      Expanded(child: Text('[${entry.tag}] ${entry.message}',
-        style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Color(0xFFD1D5DB)))),
-    ]),
-  );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: RichText(
+        text: TextSpan(
+          style: const TextStyle(
+            fontFamily: 'monospace',
+            fontSize: 11,
+            height: 1.45,
+            color: NexusColors.textDim,
+          ),
+          children: [
+            TextSpan(text: '${entry.timeStr}  '),
+            TextSpan(
+              text: entry.level.padRight(5),
+              style: TextStyle(
+                color: _color(entry.level),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            TextSpan(text: ' [${entry.tag}] ${entry.message}'),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -6,7 +6,7 @@ import 'package:hive/hive.dart';
 enum Protocol { vless, vmess, trojan, shadowsocks, hysteria2, tuic, wireguard }
 enum Transport { tcp, ws, grpc, http, quic, none }
 enum Security  { tls, reality, none }
-enum NodeSource { sub233boySingbox, sub233boyXray, sub233boyV2ray, mackA, yonggekkk, manual, unknown }
+enum NodeSource { sub233boySingbox, sub233boyXray, sub233boyV2ray, mackA, yonggekkk, manual, subscription, unknown }
 
 @HiveType(typeId: 0)
 class ProxyNode extends HiveObject {
@@ -130,27 +130,157 @@ class ProxyNode extends HiveObject {
       case NodeSource.mackA:           return 'mack-a';
       case NodeSource.yonggekkk:       return 'yonggekkk';
       case NodeSource.manual:          return '手动配置';
+      case NodeSource.subscription:    return '订阅';
       case NodeSource.unknown:         return '未知';
     }
   }
 
+  String get dedupeKey => '$server:$port:${uuid ?? password ?? privateKey ?? name}';
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'flag': flag,
+    'group': group,
+    'protocol': protocol.name,
+    'server': server,
+    'port': port,
+    'uuid': uuid,
+    'password': password,
+    'method': method,
+    'alterId': alterId,
+    'transport': transport.name,
+    'path': path,
+    'host': host,
+    'serviceName': serviceName,
+    'security': security.name,
+    'sni': sni,
+    'alpn': alpn,
+    'fingerprint': fingerprint,
+    'publicKey': publicKey,
+    'shortId': shortId,
+    'obfs': obfs,
+    'obfsPassword': obfsPassword,
+    'congestion': congestion,
+    'privateKey': privateKey,
+    'publicKeyWG': publicKeyWG,
+    'allowedIPs': allowedIPs,
+    'dns': dns,
+    'source': source.name,
+    'rawUri': rawUri,
+    'addedAt': addedAt.toIso8601String(),
+  };
+
+  factory ProxyNode.fromJson(Map<String, dynamic> json) {
+    T enumByName<T extends Enum>(List<T> values, String? name, T fallback) {
+      if (name == null) return fallback;
+      return values.firstWhere((e) => e.name == name, orElse: () => fallback);
+    }
+
+    return ProxyNode(
+      id: json['id'] as String? ?? 'node-${DateTime.now().millisecondsSinceEpoch}',
+      name: json['name'] as String? ?? '未命名',
+      flag: json['flag'] as String? ?? '🌐',
+      group: json['group'] as String? ?? '其他',
+      protocol: enumByName(Protocol.values, json['protocol'] as String?, Protocol.vless),
+      server: json['server'] as String? ?? '',
+      port: (json['port'] as num?)?.toInt() ?? 443,
+      uuid: json['uuid'] as String?,
+      password: json['password'] as String?,
+      method: json['method'] as String?,
+      alterId: (json['alterId'] as num?)?.toInt(),
+      transport: enumByName(Transport.values, json['transport'] as String?, Transport.tcp),
+      path: json['path'] as String?,
+      host: json['host'] as String?,
+      serviceName: json['serviceName'] as String?,
+      security: enumByName(Security.values, json['security'] as String?, Security.none),
+      sni: json['sni'] as String?,
+      alpn: (json['alpn'] as List?)?.map((e) => e.toString()).toList(),
+      fingerprint: json['fingerprint'] as String?,
+      publicKey: json['publicKey'] as String?,
+      shortId: json['shortId'] as String?,
+      obfs: json['obfs'] as String?,
+      obfsPassword: json['obfsPassword'] as String?,
+      congestion: json['congestion'] as String?,
+      privateKey: json['privateKey'] as String?,
+      publicKeyWG: json['publicKeyWG'] as String?,
+      allowedIPs: (json['allowedIPs'] as List?)?.map((e) => e.toString()).toList(),
+      dns: json['dns'] as String?,
+      source: enumByName(NodeSource.values, json['source'] as String?, NodeSource.unknown),
+      rawUri: json['rawUri'] as String?,
+      addedAt: DateTime.tryParse(json['addedAt'] as String? ?? '') ?? DateTime.now(),
+    );
+  }
+
   ProxyNode copyWith({
+    String? id,
+    String? name,
+    String? flag,
+    String? group,
+    Protocol? protocol,
+    String? server,
+    int? port,
+    String? uuid,
+    String? password,
+    String? method,
+    int? alterId,
+    Transport? transport,
+    String? path,
+    String? host,
+    String? serviceName,
+    Security? security,
+    String? sni,
+    List<String>? alpn,
+    String? fingerprint,
+    String? publicKey,
+    String? shortId,
+    String? obfs,
+    String? obfsPassword,
+    String? congestion,
+    String? privateKey,
+    String? publicKeyWG,
+    List<String>? allowedIPs,
+    String? dns,
+    NodeSource? source,
+    String? rawUri,
+    DateTime? addedAt,
     int? latencyMs,
     double? downloadMbps,
     double? uploadMbps,
     bool? isReachable,
   }) {
     final n = ProxyNode(
-      id: id, name: name, flag: flag, group: group,
-      protocol: protocol, server: server, port: port,
-      uuid: uuid, password: password, method: method, alterId: alterId,
-      transport: transport, path: path, host: host, serviceName: serviceName,
-      security: security, sni: sni, alpn: alpn, fingerprint: fingerprint,
-      publicKey: publicKey, shortId: shortId,
-      obfs: obfs, obfsPassword: obfsPassword, congestion: congestion,
-      privateKey: privateKey, publicKeyWG: publicKeyWG,
-      allowedIPs: allowedIPs, dns: dns,
-      source: source, rawUri: rawUri, addedAt: addedAt,
+      id: id ?? this.id,
+      name: name ?? this.name,
+      flag: flag ?? this.flag,
+      group: group ?? this.group,
+      protocol: protocol ?? this.protocol,
+      server: server ?? this.server,
+      port: port ?? this.port,
+      uuid: uuid ?? this.uuid,
+      password: password ?? this.password,
+      method: method ?? this.method,
+      alterId: alterId ?? this.alterId,
+      transport: transport ?? this.transport,
+      path: path ?? this.path,
+      host: host ?? this.host,
+      serviceName: serviceName ?? this.serviceName,
+      security: security ?? this.security,
+      sni: sni ?? this.sni,
+      alpn: alpn ?? (this.alpn != null ? List<String>.from(this.alpn!) : null),
+      fingerprint: fingerprint ?? this.fingerprint,
+      publicKey: publicKey ?? this.publicKey,
+      shortId: shortId ?? this.shortId,
+      obfs: obfs ?? this.obfs,
+      obfsPassword: obfsPassword ?? this.obfsPassword,
+      congestion: congestion ?? this.congestion,
+      privateKey: privateKey ?? this.privateKey,
+      publicKeyWG: publicKeyWG ?? this.publicKeyWG,
+      allowedIPs: allowedIPs ?? this.allowedIPs,
+      dns: dns ?? this.dns,
+      source: source ?? this.source,
+      rawUri: rawUri ?? this.rawUri,
+      addedAt: addedAt ?? this.addedAt,
     );
     n.latencyMs    = latencyMs    ?? this.latencyMs;
     n.downloadMbps = downloadMbps ?? this.downloadMbps;
@@ -158,59 +288,4 @@ class ProxyNode extends HiveObject {
     n.isReachable  = isReachable  ?? this.isReachable;
     return n;
   }
-
-  // Demo nodes for UI testing
-  static List<ProxyNode> get demoNodes => [
-    ProxyNode(id:'n1', name:'Tokyo 01', flag:'🇯🇵', group:'亚太',
-      protocol:Protocol.vless, server:'103.218.64.12', port:443,
-      uuid:'abc12345-1234-1234-1234-abc123456789',
-      transport:Transport.tcp, security:Security.reality,
-      sni:'yahoo.com', fingerprint:'chrome',
-      publicKey:'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx=',
-      shortId:'deadbeef', source:NodeSource.sub233boySingbox)
-      ..latencyMs=42,
-    ProxyNode(id:'n2', name:'Singapore Prime', flag:'🇸🇬', group:'亚太',
-      protocol:Protocol.hysteria2, server:'103.100.72.8', port:8443,
-      password:'mypassword', transport:Transport.quic, security:Security.tls,
-      sni:'103.100.72.8', source:NodeSource.yonggekkk)
-      ..latencyMs=68,
-    ProxyNode(id:'n3', name:'Los Angeles', flag:'🇺🇸', group:'北美',
-      protocol:Protocol.vless, server:'172.67.82.4', port:443,
-      uuid:'def45678-5678-5678-5678-def456789012',
-      transport:Transport.ws, security:Security.tls,
-      path:'/ws', host:'cdn.example.com', sni:'cdn.example.com',
-      source:NodeSource.mackA)
-      ..latencyMs=156,
-    ProxyNode(id:'n4', name:'HK Ultra', flag:'🇭🇰', group:'亚太',
-      protocol:Protocol.trojan, server:'43.153.86.19', port:443,
-      password:'trojanpassword', transport:Transport.tcp, security:Security.tls,
-      sni:'43.153.86.19', source:NodeSource.sub233boyXray)
-      ..latencyMs=18,
-    ProxyNode(id:'n5', name:'Frankfurt', flag:'🇩🇪', group:'欧洲',
-      protocol:Protocol.vmess, server:'104.21.44.7', port:80,
-      uuid:'ghi90123-9012-9012-9012-ghi901234567',
-      transport:Transport.ws, security:Security.none,
-      path:'/vmess', host:'104.21.44.7', source:NodeSource.sub233boyV2ray)
-      ..latencyMs=212,
-    ProxyNode(id:'n6', name:'Seoul 03', flag:'🇰🇷', group:'亚太',
-      protocol:Protocol.tuic, server:'211.249.220.4', port:8443,
-      uuid:'jkl34567-3456-3456-3456-jkl345678901', password:'tuicpass',
-      transport:Transport.quic, security:Security.tls,
-      congestion:'bbr', source:NodeSource.yonggekkk)
-      ..latencyMs=55,
-    ProxyNode(id:'n7', name:'Taipei Speed', flag:'🇹🇼', group:'亚太',
-      protocol:Protocol.shadowsocks, server:'60.251.90.3', port:8388,
-      method:'2022-blake3-aes-256-gcm',
-      password:'base64encodedpassword==',
-      transport:Transport.tcp, security:Security.none,
-      source:NodeSource.mackA)
-      ..latencyMs=35,
-    ProxyNode(id:'n8', name:'London WG', flag:'🇬🇧', group:'欧洲',
-      protocol:Protocol.wireguard, server:'185.246.208.7', port:51820,
-      privateKey:'wgPrivateKeyBase64==', publicKeyWG:'wgPeerPublicKeyBase64==',
-      allowedIPs:['0.0.0.0/0','::/0'], dns:'1.1.1.1',
-      transport:Transport.none, security:Security.none,
-      source:NodeSource.manual)
-      ..latencyMs=188,
-  ];
 }

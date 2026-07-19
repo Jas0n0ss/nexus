@@ -190,8 +190,8 @@
   .select-input { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 7px 12px; font-size: 13px; color: var(--text); outline: none; cursor: pointer; }
 
   /* ─── Modal ─── */
-  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: all 0.2s; }
-  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 100; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: auto; }
   .modal { background: rgba(18,18,28,0.95); border: 1px solid var(--border); border-radius: 20px; padding: 28px; width: 440px; max-width: 90vw; box-shadow: var(--shadow); transform: scale(0.95); transition: transform 0.2s; }
   .modal-overlay.open .modal { transform: scale(1); }
   .modal-title { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
@@ -267,7 +267,7 @@
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="runSpeedTest()">🚀 测速</button>
-          <button class="btn primary" onclick="openImportModal()">＋ 添加节点</button>
+          <button class="btn primary" type="button" onclick="goAddNode()">＋ 添加节点</button>
         </div>
       </div>
 
@@ -276,19 +276,19 @@
         <div class="connect-grid">
           <div>
             <div class="connect-status">
-              <div class="status-dot" id="statusDot"></div>
-              <div class="connect-label" id="statusLabel">已连接</div>
+              <div class="status-dot off" id="statusDot"></div>
+              <div class="connect-label" id="statusLabel">未连接</div>
             </div>
-            <div class="connect-ip" id="connectIp">103.218.64.X</div>
-            <div class="connect-meta" id="connectMeta">通过 <span id="connectNode">🇯🇵 日本 Tokyo 01</span> · VLESS + REALITY · sing-box 1.9.x</div>
+            <div class="connect-ip" id="connectIp">–</div>
+            <div class="connect-meta" id="connectMeta">尚未导入节点 · 点击右上角添加</div>
             <div style="margin-top:12px">
               <div style="font-size:12px;color:var(--text3);margin-bottom:4px">连接时长</div>
-              <div style="font-size:16px;font-weight:600" id="uptime">01:24:37</div>
+              <div style="font-size:16px;font-weight:600" id="uptime">00:00:00</div>
             </div>
           </div>
-          <button class="toggle-btn on" id="toggleBtn" onclick="toggleConnection()">
+          <button class="toggle-btn off" id="toggleBtn" onclick="toggleConnection()">
             <div class="toggle-icon">⏻</div>
-            <div id="toggleLabel">断开</div>
+            <div id="toggleLabel">连接</div>
           </button>
         </div>
       </div>
@@ -297,22 +297,22 @@
       <div class="stats-row">
         <div class="stat-card">
           <div class="stat-label">↑ 上传速度</div>
-          <div class="stat-value up" id="upSpeed">3.2</div>
+          <div class="stat-value up" id="upSpeed">0.0</div>
           <div class="stat-unit">MB/s</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">↓ 下载速度</div>
-          <div class="stat-value down" id="downSpeed">18.7</div>
+          <div class="stat-value down" id="downSpeed">0.0</div>
           <div class="stat-unit">MB/s</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">📶 延迟</div>
-          <div class="stat-value lat-good" id="latency">42</div>
+          <div class="stat-value lat-na" id="latency">–</div>
           <div class="stat-unit">ms</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">📦 总流量</div>
-          <div class="stat-value" id="totalTraffic">2.31</div>
+          <div class="stat-value" id="totalTraffic">0.00</div>
           <div class="stat-unit">GB 今日</div>
         </div>
       </div>
@@ -346,11 +346,11 @@
       <div class="page-header">
         <div>
           <div class="page-title">节点列表</div>
-          <div class="page-subtitle" id="nodeCount">共 12 个节点 · 3 个分组</div>
+          <div class="page-subtitle" id="nodeCount">尚未导入节点</div>
         </div>
         <div style="display:flex;gap:8px">
           <button class="btn" onclick="testAllNodes()">⚡ 全部测速</button>
-          <button class="btn primary" onclick="switchTab('import')">＋ 导入</button>
+          <button class="btn primary" type="button" onclick="goAddNode()">＋ 添加节点</button>
         </div>
       </div>
 
@@ -404,10 +404,10 @@ https://your.domain/v2ray/sub  (mack-a/v2ray-agent 格式)
 https://your.domain/singbox  (yonggekkk 格式)"></textarea>
           </div>
           <div style="display:flex;gap:10px;align-items:center">
-            <button class="btn primary" onclick="parseImport()" style="padding:10px 24px">
+            <button class="btn primary" type="button" onclick="parseImport()" style="padding:10px 24px">
               解析导入
             </button>
-            <button class="btn" onclick="pasteFromClipboard()">📋 从剪贴板粘贴</button>
+            <button class="btn" type="button" onclick="pasteFromClipboard()">📋 从剪贴板粘贴</button>
             <div style="flex:1"></div>
             <span style="font-size:12px;color:var(--text3)">支持 vmess:// vless:// trojan:// ss:// hysteria2:// tuic://</span>
           </div>
@@ -624,14 +624,14 @@ https://your.domain/singbox  (yonggekkk 格式)"></textarea>
 </div>
 
 <!-- ─── Import Quick Modal ─── -->
-<div class="modal-overlay" id="importModal">
-  <div class="modal">
-    <div class="modal-title">快速添加节点</div>
+<div class="modal-overlay" id="importModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="importModalTitle" onclick="event.stopPropagation()">
+    <div class="modal-title" id="importModalTitle">快速添加节点</div>
     <div style="font-size:13px;color:var(--text2);margin-bottom:12px">粘贴分享链接或 URI</div>
     <textarea id="modalInput" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:13px;font-family:monospace;resize:none;outline:none;min-height:80px" placeholder="vmess://... 或 vless://... 或订阅链接"></textarea>
     <div class="modal-row">
-      <button class="btn" onclick="closeImportModal()">取消</button>
-      <button class="btn primary" onclick="quickImport()">导入</button>
+      <button class="btn" type="button" onclick="closeImportModal()">取消</button>
+      <button class="btn primary" type="button" onclick="quickImport()">导入</button>
     </div>
   </div>
 </div>
@@ -646,24 +646,13 @@ https://your.domain/singbox  (yonggekkk 格式)"></textarea>
 // ═══════════════════════════════════════════
 // DATA
 // ═══════════════════════════════════════════
-const NODES = [
-  { id:1, name:'日本 Tokyo 01', flag:'🇯🇵', group:'亚太', proto:'VLESS+REALITY', server:'103.218.64.12', port:443, latency:42, speed:'↓35MB', up:'↑5.2MB', selected:true, source:'233boy/sing-box' },
-  { id:2, name:'新加坡 SG-Prime', flag:'🇸🇬', group:'亚太', proto:'Hysteria2', server:'103.100.72.8', port:8443, latency:68, speed:'↓89MB', up:'↑12MB', selected:false, source:'mack-a' },
-  { id:3, name:'美国 Los Angeles', flag:'🇺🇸', group:'北美', proto:'VLESS+WS+TLS', server:'172.67.82.4', port:443, latency:156, speed:'↓28MB', up:'↑4.1MB', selected:false, source:'yonggekkk' },
-  { id:4, name:'香港 HK-Ultra', flag:'🇭🇰', group:'亚太', proto:'Trojan+TLS', server:'43.153.86.19', port:443, latency:18, speed:'↓120MB', up:'↑18MB', selected:false, source:'233boy/Xray' },
-  { id:5, name:'德国 Frankfurt', flag:'🇩🇪', group:'欧洲', proto:'VMess+WS', server:'104.21.44.7', port:80, latency:212, speed:'↓15MB', up:'↑2.3MB', selected:false, source:'v2ray' },
-  { id:6, name:'韩国 Seoul 03', flag:'🇰🇷', group:'亚太', proto:'TUIC v5', server:'211.249.220.4', port:8443, latency:55, speed:'↓60MB', up:'↑9.8MB', selected:false, source:'yonggekkk' },
-  { id:7, name:'台湾 TW-Speed', flag:'🇹🇼', group:'亚太', proto:'Shadowsocks', server:'60.251.90.3', port:8388, latency:35, speed:'↓48MB', up:'↑7.1MB', selected:false, source:'mack-a' },
-  { id:8, name:'英国 London', flag:'🇬🇧', group:'欧洲', proto:'WireGuard', server:'185.246.208.7', port:51820, latency:188, speed:'↓22MB', up:'↑3.4MB', selected:false, source:'手动配置' },
-  { id:9, name:'美国 New York', flag:'🇺🇸', group:'北美', proto:'VLESS+GRPC', server:'104.16.91.23', port:443, latency:145, speed:'↓31MB', up:'↑5.6MB', selected:false, source:'233boy/sing-box' },
-  { id:10, name:'日本 Osaka 02', flag:'🇯🇵', group:'亚太', proto:'VMess+gRPC', server:'45.76.132.8', port:443, latency:48, speed:'↓52MB', up:'↑8.2MB', selected:false, source:'233boy/v2ray' },
-  { id:11, name:'法国 Paris', flag:'🇫🇷', group:'欧洲', proto:'Trojan+gRPC', server:'51.158.118.4', port:443, latency:195, speed:'↓18MB', up:'↑2.8MB', selected:false, source:'mack-a' },
-  { id:12, name:'澳大利亚 Sydney', flag:'🇦🇺', group:'大洋洲', proto:'Hysteria2', server:'139.99.130.9', port:8443, latency:112, speed:'↓41MB', up:'↑6.5MB', selected:false, source:'yonggekkk' },
-];
+/** Empty by default — nodes appear only after user import. */
+const NODES = [];
+let nextNodeId = 1;
 
-let connected = true;
+let connected = false;
 let currentGroup = '全部';
-let uptimeSeconds = 5077;
+let uptimeSeconds = 0;
 
 // ═══════════════════════════════════════════
 // NAV
@@ -759,11 +748,17 @@ setInterval(()=>{
 // CONNECTION TOGGLE
 // ═══════════════════════════════════════════
 function toggleConnection() {
+  if (!connected && NODES.length === 0) {
+    showToast('⚠️ 请先添加节点', 'warn');
+    goAddNode();
+    return;
+  }
   connected = !connected;
   const btn = document.getElementById('toggleBtn');
   const dot = document.getElementById('statusDot');
   const label = document.getElementById('statusLabel');
   const ip = document.getElementById('connectIp');
+  const selected = NODES.find(n => n.selected) || NODES[0];
 
   if (connected) {
     btn.className = 'toggle-btn on';
@@ -771,9 +766,13 @@ function toggleConnection() {
     document.getElementById('toggleLabel').textContent = '断开';
     dot.classList.remove('off');
     label.textContent = '已连接';
-    ip.textContent = '103.218.64.X';
-    showToast('✅ 已连接到 ' + NODES.find(n=>n.selected).name);
-    addLog('ok','CONNECT','已成功建立连接 via VLESS+REALITY');
+    ip.textContent = selected ? selected.server : '–';
+    document.getElementById('connectMeta').innerHTML =
+      selected
+        ? `通过 <span id="connectNode">${selected.flag} ${selected.name}</span> · ${selected.proto} · sing-box 1.9.x`
+        : '已连接';
+    showToast('✅ 已连接到 ' + (selected?.name || '节点'));
+    addLog('ok','CONNECT','已成功建立连接' + (selected ? ' via ' + selected.proto : ''));
   } else {
     btn.className = 'toggle-btn off';
     btn.querySelector('.toggle-icon').textContent = '⏻';
@@ -803,7 +802,7 @@ function latStr(ms) {
 
 function renderNodes() {
   const q = document.getElementById('nodeSearch').value.toLowerCase();
-  const groups = ['全部', ...new Set(NODES.map(n=>n.group))];
+  const groups = NODES.length ? ['全部', ...new Set(NODES.map(n=>n.group))] : [];
 
   // Render group chips
   const gc = document.getElementById('groupChips');
@@ -818,7 +817,20 @@ function renderNodes() {
     return matchGroup && matchQ;
   });
 
-  document.getElementById('nodeCount').textContent = `共 ${NODES.length} 个节点 · ${new Set(NODES.map(n=>n.group)).size} 个分组`;
+  document.getElementById('nodeCount').textContent = NODES.length
+    ? `共 ${NODES.length} 个节点 · ${new Set(NODES.map(n=>n.group)).size} 个分组`
+    : '尚未导入节点';
+
+  if (!NODES.length) {
+    document.getElementById('nodeList').innerHTML = `
+      <div style="text-align:center;padding:48px 20px;color:var(--text2)">
+        <div style="font-size:40px;margin-bottom:12px;opacity:0.5">◎</div>
+        <div style="font-size:16px;font-weight:600;color:var(--text);margin-bottom:6px">还没有节点</div>
+        <div style="font-size:13px;margin-bottom:16px">从订阅链接、分享 URI 或配置文件导入</div>
+        <button class="btn primary" type="button" onclick="goAddNode()">＋ 添加节点</button>
+      </div>`;
+    return;
+  }
 
   document.getElementById('nodeList').innerHTML = filtered.map(n => `
     <div class="node-item ${n.selected?'selected':''}" onclick="selectNode(${n.id})">
@@ -846,11 +858,13 @@ function filterNodes() { renderNodes(); }
 function selectNode(id) {
   NODES.forEach(n => n.selected = (n.id === id));
   const node = NODES.find(n=>n.id===id);
-  document.getElementById('connectNode').textContent = node.flag + ' ' + node.name;
-  document.getElementById('connectMeta').innerHTML = `通过 <span id="connectNode">${node.flag} ${node.name}</span> · ${node.proto} · sing-box 1.9.x`;
+  if (!node) return;
+  document.getElementById('connectMeta').innerHTML =
+    `通过 <span id="connectNode">${node.flag} ${node.name}</span> · ${node.proto} · sing-box 1.9.x`;
   renderNodes();
   renderQuickNodes();
   if (connected) {
+    document.getElementById('connectIp').textContent = node.server;
     showToast('🔄 已切换到 ' + node.name);
     addLog('info','SWITCH','切换节点 → ' + node.name + ' (' + node.proto + ')');
     addLog('ok','CONNECT','新节点连接成功，延迟 ' + node.latency + 'ms');
@@ -881,6 +895,11 @@ function testNode(id) {
 }
 
 function testAllNodes() {
+  if (!NODES.length) {
+    showToast('⚠️ 请先添加节点', 'warn');
+    goAddNode();
+    return;
+  }
   showToast('⚡ 正在测试全部节点延迟...');
   addLog('info','PING','开始批量延迟测试（' + NODES.length + ' 节点）');
   NODES.forEach((n,i) => {
@@ -905,8 +924,17 @@ function runSpeedTest() {
 
 // Quick nodes on dashboard
 function renderQuickNodes() {
+  const el = document.getElementById('quickNodes');
+  if (!NODES.length) {
+    el.innerHTML = `
+      <div style="width:100%;padding:16px;text-align:center;color:var(--text2);font-size:13px">
+        导入节点后可在此快速切换 ·
+        <a href="#" onclick="goAddNode();return false" style="color:var(--accent)">添加节点</a>
+      </div>`;
+    return;
+  }
   const top = [...NODES].sort((a,b)=>a.latency-b.latency).slice(0,5);
-  document.getElementById('quickNodes').innerHTML = top.map(n=>`
+  el.innerHTML = top.map(n=>`
     <div onclick="selectNode(${n.id})" style="cursor:pointer;background:var(--surface);border:1px solid ${n.selected?'var(--accent)':'var(--border)'};border-radius:10px;padding:10px 14px;font-size:13px;transition:all 0.15s;flex:1;min-width:140px;max-width:200px">
       <div style="font-size:20px;margin-bottom:4px">${n.flag}</div>
       <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n.name.replace(/^.*? /,'')}</div>
@@ -999,17 +1027,27 @@ function parseImport() {
         ${n.fix ? `<span style="font-size:11px;color:var(--yellow)">🔧 已修复</span>` : ''}
       </div>`).join('');
 
-    // Add nodes to list
-    EXAMPLE_NODES.forEach((en, i) => {
-      if (!NODES.find(n=>n.name.includes(en.name.replace(/^...\s*/,'')))) {
-        NODES.push({
-          id: 100+i, name: en.name, flag: en.name[0]+en.name[1],
-          group: '导入节点', proto: en.proto, server: '–', port: 443,
-          latency: Math.floor(Math.random()*200+20), speed: '–', up: '–',
-          selected: false, source
-        });
-      }
+    // Add nodes to list (only from this parse — no preset seed data)
+    EXAMPLE_NODES.forEach((en) => {
+      const short = en.name.replace(/^[\u{1F1E6}-\u{1F1FF}]{2}\s*/u, '');
+      if (NODES.find(n => n.name.includes(short))) return;
+      const flagMatch = en.name.match(/^([\u{1F1E6}-\u{1F1FF}]{2})/u);
+      NODES.push({
+        id: nextNodeId++,
+        name: short || en.name,
+        flag: flagMatch ? flagMatch[1] : '🌐',
+        group: '导入节点',
+        proto: en.proto,
+        server: 'imported.local',
+        port: 443,
+        latency: Math.floor(Math.random()*200+20),
+        speed: '–',
+        up: '–',
+        selected: NODES.length === 0,
+        source
+      });
     });
+    if (NODES.length && !NODES.some(n => n.selected)) NODES[0].selected = true;
     renderNodes(); renderQuickNodes();
     showToast(`✅ 已导入 ${EXAMPLE_NODES.length} 个节点`);
     addLog('ok','IMPORT',`成功导入 ${EXAMPLE_NODES.length} 个节点，来源：${source}`);
@@ -1021,17 +1059,8 @@ function parseImport() {
 // ═══════════════════════════════════════════
 const INITIAL_LOGS = [
   {t:'09:12:04', level:'info', msg:'Nexus VPN 已启动，内核版本 sing-box <hl>1.9.3</hl>'},
-  {t:'09:12:05', level:'info', msg:'加载配置文件 config.json'},
-  {t:'09:12:05', level:'ok',   msg:'TUN 接口 <hl>tun0</hl> 创建成功'},
-  {t:'09:12:06', level:'info', msg:'DNS 服务器：<hl>https://1.1.1.1/dns-query</hl>'},
-  {t:'09:12:07', level:'ok',   msg:'连接 <hl>日本 Tokyo 01</hl> (VLESS+REALITY) 成功，延迟 42ms'},
-  {t:'09:14:21', level:'info', msg:'自动测试 google.com → <hl>200 OK</hl> (68ms)'},
-  {t:'09:14:21', level:'info', msg:'自动测试 1.1.1.1 → <hl>可达</hl> (31ms)'},
-  {t:'09:18:55', level:'warn', msg:'节点 美国 LA 延迟超阈值 (312ms)，已记录'},
-  {t:'09:20:11', level:'ok',   msg:'DNS 泄漏检测：<hl>无泄漏</hl>'},
-  {t:'09:45:03', level:'info', msg:'流量统计：↑ 0.84GB  ↓ 1.47GB'},
-  {t:'10:02:18', level:'ok',   msg:'自动修复：VMess 节点 encryption 字段已纠正 (auto→none)'},
-  {t:'10:02:19', level:'ok',   msg:'自动修复：ALPN 配置不匹配已纠正 [h2,http/1.1]→[h2]'},
+  {t:'09:12:05', level:'info', msg:'等待导入节点配置'},
+  {t:'09:12:05', level:'info', msg:'DNS 服务器：<hl>https://1.1.1.1/dns-query</hl>'},
 ];
 
 let logFilter = 'all';
@@ -1081,11 +1110,28 @@ function saveCore() {
 // ═══════════════════════════════════════════
 // MODAL
 // ═══════════════════════════════════════════
-function openImportModal() { document.getElementById('importModal').classList.add('open'); }
-function closeImportModal() { document.getElementById('importModal').classList.remove('open'); }
+function goAddNode() {
+  switchTab('import');
+  openImportModal();
+}
+function openImportModal() {
+  const modal = document.getElementById('importModal');
+  modal.classList.add('open');
+  modal.setAttribute('aria-hidden', 'false');
+  const input = document.getElementById('modalInput');
+  setTimeout(() => input?.focus(), 50);
+}
+function closeImportModal() {
+  const modal = document.getElementById('importModal');
+  modal.classList.remove('open');
+  modal.setAttribute('aria-hidden', 'true');
+}
 function quickImport() {
   const v = document.getElementById('modalInput').value.trim();
-  if (!v) return;
+  if (!v) {
+    showToast('⚠️ 请粘贴订阅链接或 URI', 'warn');
+    return;
+  }
   closeImportModal();
   switchTab('import');
   document.getElementById('importInput').value = v;
@@ -1093,6 +1139,9 @@ function quickImport() {
 }
 document.getElementById('importModal').addEventListener('click', e => {
   if (e.target === document.getElementById('importModal')) closeImportModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeImportModal();
 });
 
 // ═══════════════════════════════════════════
@@ -1113,18 +1162,6 @@ function showToast(msg, type='ok') {
 renderNodes();
 renderQuickNodes();
 renderLogs();
-
-// Simulate live log entries
-const liveLogs = [
-  [3000,'info','TRAFFIC','当前速率 ↓18.7 MB/s ↑3.2 MB/s'],
-  [6000,'ok','HEALTH','内核健康检查通过'],
-  [10000,'info','DNS','已解析 api.github.com → 140.82.113.6'],
-  [14000,'warn','LATENCY','节点 德国 Frankfurt 延迟升高 (212ms)'],
-  [18000,'ok','PING','自动延迟测试完成，最优节点 香港 HK-Ultra (18ms)'],
-];
-liveLogs.forEach(([delay,level,tag,msg])=>{
-  setTimeout(()=>addLog(level,tag,msg), delay);
-});
 </script>
 </body>
 </html>

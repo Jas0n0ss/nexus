@@ -1,106 +1,297 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+
 import '../models/proxy_node.dart';
+import '../providers/settings_provider.dart';
 import 'config_generator.dart';
+import 'platform_vpn.dart';
 
 class CoreStats {
   final double uploadMbps;
   final double downloadMbps;
   final int latencyMs;
-  CoreStats({required this.uploadMbps, required this.downloadMbps, required this.latencyMs});
+  CoreStats({
+    required this.uploadMbps,
+    required this.downloadMbps,
+    required this.latencyMs,
+  });
 }
 
 class SingboxRunner {
   Process? _process;
   StreamController<String>? _logStream;
-  Timer? _fakeTicker; // Used when binary not available (simulator mode)
-  double _fakeUp = 0, _fakeDown = 0;
+  Timer? _exitWatcher;
+  bool _usingNative = false;
+  bool _usingSystemProxy = false;
+  String? _configPath;
+  int _mixedPort = 7890;
+
+  // traffic sampling
+  int _lastUp = 0;
+  int _lastDown = 0;
+  DateTime? _lastTrafficAt;
 
   Stream<String> get logs => _logStream?.stream ?? const Stream.empty();
+  bool get isRunning => _process != null || _usingNative;
+  String? get configPath => _configPath;
+  int get mixedPort => _mixedPort;
 
-  /// Start the sing-box core process with config generated from [node].
-  Future<void> start(ProxyNode node) async {
+  /// Start sing-box with settings-aware config. Throws if core cannot run.
+  Future<void> start(ProxyNode node, {SettingsProvider? settings}) async {
     await stop();
     _logStream = StreamController.broadcast();
+    _mixedPort = settings?.mixedPort ?? 7890;
 
-    // Generate sing-box config
-    final config = ConfigGenerator.generate(node);
-    final configJson = jsonEncode(config);
+    if (node.server.isEmpty) {
+      throw Exception('节点服务器地址为空，无法连接');
+    }
 
-    // Write config to temp file
+    final config = ConfigGenerator.generate(node, settings: settings);
+    final configJson = const JsonEncoder.withIndent('  ').convert(config);
+
     final tmpDir = await getTemporaryDirectory();
     final configFile = File('${tmpDir.path}/nexus-singbox.json');
     await configFile.writeAsString(configJson);
+    _configPath = configFile.path;
+    _logStream?.add('[INFO] 配置已写入 ${_configPath}');
 
-    // Try to find sing-box binary
-    final binary = await _findBinary();
-
-    if (binary != null) {
-      // Real mode: spawn the process
-      _process = await Process.start(binary, ['run', '-c', configFile.path],
-        runInShell: false);
-
-      _process!.stdout.transform(utf8.decoder).listen((line) {
-        _logStream?.add(line.trim());
-      });
-      _process!.stderr.transform(utf8.decoder).listen((line) {
-        _logStream?.add('[ERR] ${line.trim()}');
-      });
-    } else {
-      // Simulator mode: pretend to be connected (for UI demo / CI)
-      _logStream?.add('[INFO] sing-box binary not found — running in simulator mode');
-      _logStream?.add('[INFO] Config written to ${configFile.path}');
-      _logStream?.add('[OK] Simulator: connected to ${node.name}');
-      _startSimulator();
+    // Prefer native VPN channel (Windows WinTUN / Android VpnService)
+    if (PlatformVpn.supportsNativeChannel) {
+      try {
+        final ok = await PlatformVpn.startVpn(configJson);
+        if (ok) {
+          _usingNative = true;
+          _logStream?.add('[OK] 已通过平台 VPN 通道启动');
+          _watchNative();
+          return;
+        }
+        _logStream?.add('[INFO] 平台通道未接管，回退到本地 sing-box 进程');
+      } catch (e) {
+        _logStream?.add('[WARN] 平台 VPN: $e — 尝试本地进程');
+      }
     }
+
+    final binary = await _findBinary();
+    if (binary == null) {
+      final msg = '未找到 sing-box 核心。请确认安装包内含 cores/sing-box，'
+          '或将 sing-box 放到应用目录。配置已生成: ${_configPath}';
+      _logStream?.add('[ERR] $msg');
+      // Only allow fake simulator in explicit debug + flag
+      if (kDebugMode &&
+          const bool.fromEnvironment('NEXUS_ALLOW_SIMULATOR', defaultValue: false)) {
+        _logStream?.add('[WARN] 调试模拟器模式已启用（流量不会真正代理）');
+        return;
+      }
+      throw Exception(msg);
+    }
+
+    _logStream?.add('[INFO] 启动核心: $binary');
+    _process = await Process.start(
+      binary,
+      ['run', '-c', configFile.path],
+      runInShell: false,
+      workingDirectory: File(binary).parent.path,
+    );
+
+    _process!.stdout.transform(utf8.decoder).listen((line) {
+      for (final l in line.split('\n')) {
+        final t = l.trim();
+        if (t.isNotEmpty) _logStream?.add(t);
+      }
+    });
+    _process!.stderr.transform(utf8.decoder).listen((line) {
+      for (final l in line.split('\n')) {
+        final t = l.trim();
+        if (t.isNotEmpty) _logStream?.add('[ERR] $t');
+      }
+    });
+
+    // Fail fast if process exits immediately
+    await Future.delayed(const Duration(milliseconds: 400));
+    final exitCode = await _process!.exitCode.timeout(
+      const Duration(milliseconds: 50),
+      onTimeout: () => -999,
+    );
+    if (exitCode != -999) {
+      _process = null;
+      throw Exception('sing-box 启动后立即退出 (code=$exitCode)。请检查配置与权限（TUN 需管理员）。');
+    }
+
+    _exitWatcher = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (_process == null) return;
+      try {
+        final code = await _process!.exitCode.timeout(
+          const Duration(milliseconds: 20),
+          onTimeout: () => -999,
+        );
+        if (code != -999) {
+          _logStream?.add('[ERR] sing-box 进程已退出 (code=$code)');
+          _process = null;
+        }
+      } catch (_) {}
+    });
+
+    // Desktop system proxy when TUN is off
+    final wantTun = settings?.tunMode ?? true;
+    final wantSysProxy = settings?.systemProxy ?? true;
+    if (!wantTun && wantSysProxy &&
+        (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+      final ok = await PlatformVpn.setSystemProxy(
+        host: '127.0.0.1',
+        port: _mixedPort,
+      );
+      _usingSystemProxy = ok;
+      if (ok) {
+        _logStream?.add('[OK] 系统代理 → 127.0.0.1:$_mixedPort');
+      } else if (Platform.isWindows) {
+        // Fallback: WinINET via netsh (best-effort)
+        try {
+          await Process.run('netsh', [
+            'winhttp', 'set', 'proxy',
+            'proxy-server=127.0.0.1:$_mixedPort',
+          ]);
+          _usingSystemProxy = true;
+          _logStream?.add('[OK] netsh 系统代理已设置');
+        } catch (e) {
+          _logStream?.add('[WARN] 系统代理设置失败: $e（可手动指向 127.0.0.1:$_mixedPort）');
+        }
+      } else {
+        _logStream?.add('[WARN] 未能自动设置系统代理，请手动使用 127.0.0.1:$_mixedPort');
+      }
+    }
+
+    _logStream?.add('[OK] 已连接 ${node.name}（mixed=$_mixedPort，TUN=${wantTun ? "开" : "关"}，路由=${settings?.routeMode.name ?? "rule"}）');
   }
 
   Future<void> stop() async {
-    _fakeTicker?.cancel();
-    _process?.kill();
+    _exitWatcher?.cancel();
+    _exitWatcher = null;
+
+    if (_usingNative) {
+      await PlatformVpn.stopVpn();
+      _usingNative = false;
+    }
+
+    if (_usingSystemProxy) {
+      await PlatformVpn.clearSystemProxy();
+      if (Platform.isWindows) {
+        try {
+          await Process.run('netsh', ['winhttp', 'reset', 'proxy']);
+        } catch (_) {}
+      }
+      _usingSystemProxy = false;
+    }
+
+    final p = _process;
     _process = null;
+    if (p != null) {
+      p.kill();
+      try {
+        await p.exitCode.timeout(const Duration(seconds: 2));
+      } catch (_) {
+        p.kill(ProcessSignal.sigkill);
+      }
+    }
+
     await _logStream?.close();
     _logStream = null;
+    _lastUp = 0;
+    _lastDown = 0;
+    _lastTrafficAt = null;
   }
 
   Future<CoreStats> getStats() async {
-    if (_process != null) {
-      // In production: query Clash API /traffic endpoint
-      // GET http://127.0.0.1:9090/traffic
-      return CoreStats(
-        uploadMbps: _fakeUp,
-        downloadMbps: _fakeDown,
-        latencyMs: 40 + (DateTime.now().millisecondsSinceEpoch % 60),
-      );
+    try {
+      final resp = await http
+          .get(Uri.parse('http://127.0.0.1:9090/traffic'))
+          .timeout(const Duration(milliseconds: 800));
+      if (resp.statusCode == 200) {
+        // Clash API streams NDJSON; take last complete object if possible
+        final lines = resp.body.trim().split('\n').where((l) => l.isNotEmpty);
+        if (lines.isNotEmpty) {
+          final json = jsonDecode(lines.last) as Map<String, dynamic>;
+          final up = (json['up'] as num?)?.toInt() ?? 0;
+          final down = (json['down'] as num?)?.toInt() ?? 0;
+          final now = DateTime.now();
+          double upMbps = 0, downMbps = 0;
+          if (_lastTrafficAt != null) {
+            final dt = now.difference(_lastTrafficAt!).inMilliseconds / 1000.0;
+            if (dt > 0) {
+              upMbps = ((up - _lastUp).clamp(0, 1 << 30) * 8 / dt) / 1e6;
+              downMbps = ((down - _lastDown).clamp(0, 1 << 30) * 8 / dt) / 1e6;
+            }
+          }
+          _lastUp = up;
+          _lastDown = down;
+          _lastTrafficAt = now;
+          return CoreStats(
+            uploadMbps: upMbps,
+            downloadMbps: downMbps,
+            latencyMs: await _probeLatency(),
+          );
+        }
+      }
+    } catch (_) {
+      // Clash API may stream forever; ignore and return zeros
     }
-    return CoreStats(uploadMbps: _fakeUp, downloadMbps: _fakeDown,
-      latencyMs: 40 + (DateTime.now().millisecondsSinceEpoch % 60));
+    return CoreStats(uploadMbps: 0, downloadMbps: 0, latencyMs: await _probeLatency());
   }
 
-  void _startSimulator() {
-    _fakeTicker = Timer.periodic(const Duration(milliseconds: 800), (_) {
-      _fakeUp   = 0.5 + (DateTime.now().millisecondsSinceEpoch % 100) / 20.0;
-      _fakeDown = 2.0 + (DateTime.now().millisecondsSinceEpoch % 500) / 25.0;
-    });
+  Future<int> _probeLatency() async {
+    try {
+      final sw = Stopwatch()..start();
+      final client = HttpClient();
+      client.findProxy = (_) => 'PROXY 127.0.0.1:$_mixedPort';
+      client.connectionTimeout = const Duration(seconds: 3);
+      final req = await client.getUrl(Uri.parse('http://cp.cloudflare.com/generate_204'));
+      final resp = await req.close().timeout(const Duration(seconds: 3));
+      await resp.drain<void>();
+      client.close(force: true);
+      sw.stop();
+      return sw.elapsedMilliseconds;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  void _watchNative() {
+    // Native path has no Process handle; stats still come from Clash API.
   }
 
   Future<String?> _findBinary() async {
-    // Search standard locations for sing-box binary
-    final candidates = [
-      // macOS
-      '/usr/local/bin/sing-box',
-      '/opt/homebrew/bin/sing-box',
-      // Linux
-      '/usr/bin/sing-box',
-      // bundled in app
-      '${(await getApplicationSupportDirectory()).path}/cores/sing-box',
-      // Windows
-      r'C:\Program Files\sing-box\sing-box.exe',
+    final exeName = Platform.isWindows ? 'sing-box.exe' : 'sing-box';
+    final support = (await getApplicationSupportDirectory()).path;
+    final exeDir = File(Platform.resolvedExecutable).parent.path;
+
+    final candidates = <String>[
+      '$exeDir/$exeName',
+      '$exeDir/cores/$exeName',
+      '$support/cores/$exeName',
+      '$exeDir/data/flutter_assets/assets/cores/$exeName',
+      if (Platform.isMacOS) ...[
+        '/usr/local/bin/sing-box',
+        '/opt/homebrew/bin/sing-box',
+      ],
+      if (Platform.isLinux) ...[
+        '/usr/bin/sing-box',
+        '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
+      ],
+      if (Platform.isWindows) r'C:\Program Files\sing-box\sing-box.exe',
+      // Android extracted asset
+      if (Platform.isAndroid) ...[
+        '$support/cores/sing-box',
+        '/data/data/com.nexusvpn.nexus_vpn/files/cores/sing-box',
+      ],
     ];
+
     for (final path in candidates) {
-      if (await File(path).exists()) return path;
+      final f = File(path);
+      if (await f.exists()) return f.path;
     }
     return null;
   }
