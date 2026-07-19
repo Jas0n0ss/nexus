@@ -5,6 +5,7 @@ import '../theme/nexus_theme.dart';
 class NexusSurface extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry? padding;
+  final Color? color;
   final Color? borderColor;
   final Gradient? gradient;
   final double radius;
@@ -14,6 +15,7 @@ class NexusSurface extends StatelessWidget {
     super.key,
     required this.child,
     this.padding,
+    this.color,
     this.borderColor,
     this.gradient,
     this.radius = 14,
@@ -23,14 +25,14 @@ class NexusSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
+    final fill = color ??
+        (dark ? NexusColors.surface : NexusColors.lightSurface);
     final box = AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       padding: padding ?? const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: gradient,
-        color: gradient == null
-            ? (dark ? NexusColors.surface.withOpacity(0.92) : Colors.white.withOpacity(0.9))
-            : null,
+        color: gradient == null ? fill : null,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: borderColor ?? NexusColors.line),
       ),
@@ -38,7 +40,9 @@ class NexusSurface extends StatelessWidget {
     );
     if (onTap == null) return box;
     return Material(
-      color: Colors.transparent,
+      color: fill,
+      borderRadius: BorderRadius.circular(radius),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(radius),
@@ -56,5 +60,6 @@ class GlassCard extends NexusSurface {
     EdgeInsets? padding,
     super.gradient,
     super.borderColor,
+    super.color,
   }) : super(padding: padding);
 }

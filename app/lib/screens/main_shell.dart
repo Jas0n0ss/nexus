@@ -49,13 +49,13 @@ class _DesktopShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Row(
         children: [
           Container(
             width: 204,
             decoration: BoxDecoration(
-              color: dark ? NexusColors.bgDeep : const Color(0xFFF8FBFC),
+              color: dark ? NexusColors.bgMid : const Color(0xFFF8FBFC),
               border: Border(
                 right: BorderSide(
                   color: dark ? NexusColors.line : const Color(0x1A102027),
@@ -70,20 +70,14 @@ class _DesktopShell extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Row(
                     children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10),
-                          gradient: const LinearGradient(
-                            colors: [
-                              NexusColors.accent,
-                              NexusColors.accentDeep
-                            ],
-                          ),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: Image.asset(
+                          'assets/icons/app_icon.png',
+                          width: 34,
+                          height: 34,
+                          fit: BoxFit.cover,
                         ),
-                        child: const Icon(Icons.shield_moon_rounded,
-                            size: 18, color: Color(0xFF042F2E)),
                       ),
                       const SizedBox(width: 10),
                       Text(
@@ -149,13 +143,19 @@ class _NavTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 9),
           decoration: BoxDecoration(
             color: active
-                ? NexusColors.accent.withOpacity(0.12)
-                : Colors.transparent,
+                ? (Theme.of(context).brightness == Brightness.dark
+                    ? NexusColors.surfaceLift
+                    : const Color(0xFFDCEAED))
+                : (Theme.of(context).brightness == Brightness.dark
+                    ? NexusColors.bgMid
+                    : const Color(0xFFF8FBFC)),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
               color: active
-                  ? NexusColors.accent.withOpacity(0.35)
-                  : Colors.transparent,
+                  ? NexusColors.accent.withOpacity(0.45)
+                  : (Theme.of(context).brightness == Brightness.dark
+                      ? NexusColors.bgMid
+                      : const Color(0xFFF8FBFC)),
             ),
           ),
           child: Row(
@@ -193,7 +193,7 @@ class _SidebarStatus extends StatelessWidget {
     final updates = context.watch<UpdateProvider>();
     final line = dark ? NexusColors.line : const Color(0x1A102027);
     final surface =
-        dark ? NexusColors.surface.withOpacity(0.72) : const Color(0xFFEAF2F4);
+        dark ? NexusColors.surface : const Color(0xFFEAF2F4);
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -298,7 +298,7 @@ class _MobileShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: IndexedStack(index: index, children: screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: index,

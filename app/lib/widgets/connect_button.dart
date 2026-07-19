@@ -10,12 +10,31 @@ class ConnectButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final isOn = state == SessionState.connected;
+    final isError = state == SessionState.error;
     final isLoading =
         state == SessionState.connecting || state == SessionState.disconnecting;
     final label = isLoading
-        ? (state == SessionState.connecting ? '…' : '…')
+        ? '…'
         : (isOn ? '断开' : '连接');
+
+    final Color fill;
+    final Color border;
+    final Color fg;
+    if (isOn) {
+      fill = NexusColors.accent;
+      border = NexusColors.accentDeep;
+      fg = const Color(0xFF042F2E);
+    } else if (isError) {
+      fill = dark ? const Color(0xFF2A1A1C) : const Color(0xFFF8E8E9);
+      border = NexusColors.danger;
+      fg = NexusColors.danger;
+    } else {
+      fill = dark ? NexusColors.surfaceLift : const Color(0xFFE4ECF0);
+      border = dark ? NexusColors.line : const Color(0x33102027);
+      fg = dark ? NexusColors.textDim : NexusColors.lightText.withOpacity(0.7);
+    }
 
     return GestureDetector(
       onTap: isLoading ? null : onToggle,
@@ -26,33 +45,15 @@ class ConnectButton extends StatelessWidget {
         height: 96,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
+          color: isOn ? null : fill,
           gradient: isOn
               ? const LinearGradient(
                   colors: [NexusColors.accent, NexusColors.accentDeep],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
-              : LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.10),
-                    Colors.white.withOpacity(0.04),
-                  ],
-                ),
-          border: Border.all(
-            color: isOn
-                ? NexusColors.accent.withOpacity(0.55)
-                : Colors.white.withOpacity(0.14),
-            width: 1.2,
-          ),
-          boxShadow: isOn
-              ? [
-                  BoxShadow(
-                    color: NexusColors.accent.withOpacity(0.28),
-                    blurRadius: 28,
-                    spreadRadius: 0,
-                  ),
-                ]
               : null,
+          border: Border.all(color: border, width: 1.4),
         ),
         child: Center(
           child: isLoading
@@ -70,7 +71,7 @@ class ConnectButton extends StatelessWidget {
                     Icon(
                       Icons.power_settings_new_rounded,
                       size: 28,
-                      color: isOn ? const Color(0xFF042F2E) : NexusColors.textDim,
+                      color: fg,
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -79,7 +80,7 @@ class ConnectButton extends StatelessWidget {
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 0.4,
-                        color: isOn ? const Color(0xFF042F2E) : NexusColors.textDim,
+                        color: fg,
                       ),
                     ),
                   ],

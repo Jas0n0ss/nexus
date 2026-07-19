@@ -171,7 +171,7 @@ class NexusTunnelService : VpnService() {
     private fun showNotification(title: String, text: String) {
         createChannel()
         // Use a system icon — the app's R class lives in the Flutter-generated
-        // package (com.nexusvpn.nexus_vpn) and no custom drawable is bundled.
+        // package (com.nexusvpn.nexus); launcher icon is applied during packaging.
         val icon = android.R.drawable.ic_lock_idle_lock
         val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             Notification.Builder(this, CHANNEL_ID)

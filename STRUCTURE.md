@@ -3,7 +3,7 @@
 > 每个文件均附有功能说明，帮助新贡献者快速定位代码。
 
 ```
-nexus-vpn/
+nexus/
 │
 ├── README.md                          # English project overview (canonical)
 ├── README.zh-CN.md                    # 简体中文版 README
@@ -169,7 +169,7 @@ nexus-vpn/
     │   ├── Runner/                     # 主 App Target
     │   │   ├── AppDelegate.swift
     │   │   └── Assets.xcassets/
-    │   └── NexusVPNExtension/          # Network Extension Target（iOS / macOS 共用）
+    │   └── NexusExtension/             # Network Extension Target（iOS / macOS 共用）
     │       ├── PacketTunnelProvider.swift  # NEPacketTunnelProvider 子类
     │       │                               #   startTunnel()：写配置到 AppGroup 容器 /
     │       │                               #                  setTunnelNetworkSettings() /
@@ -215,7 +215,7 @@ nexus-vpn/
     │   │   ├── sing-box.exe           # 构建时下载（gitignore）
     │   │   └── wintun.dll             # 构建时下载（gitignore）
     │   └── installer/
-    │       └── nexus-vpn.iss          # Inno Setup 6 安装包脚本
+    │       └── nexus.iss              # Inno Setup 6 安装包脚本
     │                                  #   打包：Flutter Release + sing-box.exe + wintun.dll
     │                                  #   功能：WinTUN 驱动静默安装 / PATH 注册 /
     │                                  #         桌面快捷方式 / 开机启动选项
@@ -226,7 +226,7 @@ nexus-vpn/
     │   ├── Runner/
     │   │   ├── AppDelegate.swift
     │   │   └── Assets.xcassets/
-    │   └── NexusVPNExtension/         # macOS Network Extension（与 iOS 共用 Swift 代码）
+    │   └── NexusExtension/            # macOS Network Extension（与 iOS 共用 Swift 代码）
     │       └── PacketTunnelProvider.swift  # 同 iOS（通过 #if os(macOS) 做平台差异）
     │
     ├── linux/

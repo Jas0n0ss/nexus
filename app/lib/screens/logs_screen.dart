@@ -37,7 +37,7 @@ class _LogsScreenState extends State<LogsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
@@ -112,7 +112,9 @@ class _Chip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? NexusColors.accent.withOpacity(0.14) : Colors.transparent,
+          color: active
+              ? NexusColors.surfaceLift
+              : Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: active ? NexusColors.accent.withOpacity(0.4) : NexusColors.line,

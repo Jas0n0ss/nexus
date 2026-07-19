@@ -13,6 +13,7 @@ class ConfigGenerator {
     bool? blockAds,
     bool? allowLan,
     int mixedPort = 7890,
+    String cachePath = 'cache.db',
   }) {
     final tun = tunMode ?? settings?.tunMode ?? true;
     final dnsLeak = dnsLeakProtection ?? settings?.dnsLeakProtection ?? true;
@@ -24,13 +25,14 @@ class ConfigGenerator {
 
     return {
       'log': {'level': 'info', 'timestamp': true},
-      'dns': _dns(dnsLeak, dns),
-      'inbounds': _inbounds(tun: tun, allowLan: lan, mixedPort: mixedPort, sniff: sniff),
+      'dns': _dns(dnsLeak, dns, useRuleSets: mode == 'rule'),
+      'inbounds': _inbounds(
+          tun: tun, allowLan: lan, mixedPort: mixedPort, sniff: sniff),
       'outbounds': [
         _outbound(node, mux: settings?.mux == true),
         {'type': 'direct', 'tag': 'direct'},
-        {'type': 'block',  'tag': 'block'},
-        {'type': 'dns',    'tag': 'dns-out'},
+        {'type': 'block', 'tag': 'block'},
+        {'type': 'dns', 'tag': 'dns-out'},
       ],
       'route': _route(mode, blockAds: ads),
       'experimental': {
@@ -38,72 +40,97 @@ class ConfigGenerator {
           'external_controller': '127.0.0.1:9090',
           'secret': '',
         },
-        'cache_file': {'enabled': true, 'path': 'cache.db'},
+        'cache_file': {'enabled': true, 'path': cachePath},
       },
     };
   }
 
-  static Map<String, dynamic> _dns(bool leakProtection, String remoteDns) => {
-    'servers': [
-      {'tag': 'dns-remote', 'address': remoteDns, 'detour': 'proxy'},
-      {'tag': 'dns-local',  'address': 'https://223.5.5.5/dns-query', 'detour': 'direct'},
-      {'tag': 'dns-block',  'address': 'rcode://success'},
-    ],
-    'rules': [
-      if (leakProtection) ...[
-        {'rule_set': ['geosite-cn'], 'server': 'dns-local'},
-        {'rule_set': ['geosite-geolocation-!cn'], 'server': 'dns-remote'},
-      ] else ...[
-        {'rule_set': ['geosite-cn'], 'server': 'dns-local'},
-      ],
-    ],
-    'final': leakProtection ? 'dns-remote' : 'dns-local',
-    'strategy': 'prefer_ipv4',
-    'independent_cache': true,
-  };
+  static Map<String, dynamic> _dns(
+    bool leakProtection,
+    String remoteDns, {
+    required bool useRuleSets,
+  }) =>
+      {
+        'servers': [
+          {'tag': 'dns-remote', 'address': remoteDns, 'detour': 'proxy'},
+          {
+            'tag': 'dns-local',
+            'address': 'https://223.5.5.5/dns-query',
+            'detour': 'direct'
+          },
+          {'tag': 'dns-block', 'address': 'rcode://success'},
+        ],
+        'rules': [
+          if (useRuleSets && leakProtection) ...[
+            {
+              'rule_set': ['geosite-cn'],
+              'server': 'dns-local'
+            },
+            {
+              'rule_set': ['geosite-geolocation-!cn'],
+              'server': 'dns-remote'
+            },
+          ] else if (useRuleSets) ...[
+            {
+              'rule_set': ['geosite-cn'],
+              'server': 'dns-local'
+            },
+          ],
+        ],
+        'final': leakProtection ? 'dns-remote' : 'dns-local',
+        'strategy': 'prefer_ipv4',
+        'independent_cache': true,
+      };
 
   static List<Map<String, dynamic>> _inbounds({
     required bool tun,
     required bool allowLan,
     required int mixedPort,
     required bool sniff,
-  }) => [
-    {
-      'type': 'mixed',
-      'tag': 'mixed-in',
-      'listen': allowLan ? '0.0.0.0' : '127.0.0.1',
-      'listen_port': mixedPort,
-      'sniff': sniff,
-      'sniff_override_destination': sniff,
-    },
-    if (tun) {
-      'type': 'tun',
-      'tag': 'tun-in',
-      'interface_name': 'tun0',
-      'address': ['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
-      'mtu': 9000,
-      'auto_route': true,
-      'strict_route': true,
-      'stack': 'system',
-      'sniff': sniff,
-      'sniff_override_destination': sniff,
-    },
-  ];
+  }) =>
+      [
+        {
+          'type': 'mixed',
+          'tag': 'mixed-in',
+          'listen': allowLan ? '0.0.0.0' : '127.0.0.1',
+          'listen_port': mixedPort,
+          'sniff': sniff,
+          'sniff_override_destination': sniff,
+        },
+        if (tun)
+          {
+            'type': 'tun',
+            'tag': 'tun-in',
+            'interface_name': 'tun0',
+            // sing-box 1.9.x schema. `address` is only accepted by newer cores.
+            'inet4_address': '172.19.0.1/30',
+            'inet6_address': 'fdfe:dcba:9876::1/126',
+            'mtu': 9000,
+            'auto_route': true,
+            'strict_route': true,
+            'stack': 'system',
+            'sniff': sniff,
+            'sniff_override_destination': sniff,
+          },
+      ];
 
   static Map<String, dynamic> _outbound(ProxyNode n, {bool mux = false}) {
     final ob = <String, dynamic>{
-      'type': n.protocol == Protocol.shadowsocks ? 'shadowsocks' : n.protocol.name,
+      'type':
+          n.protocol == Protocol.shadowsocks ? 'shadowsocks' : n.protocol.name,
       'tag': 'proxy',
     };
 
     if (n.protocol == Protocol.wireguard) {
       ob['private_key'] = n.privateKey;
-      ob['peers'] = [{
-        'public_key': n.publicKeyWG,
-        'server': n.server,
-        'server_port': n.port,
-        'allowed_ips': n.allowedIPs ?? ['0.0.0.0/0', '::/0'],
-      }];
+      ob['peers'] = [
+        {
+          'public_key': n.publicKeyWG,
+          'server': n.server,
+          'server_port': n.port,
+          'allowed_ips': n.allowedIPs ?? ['0.0.0.0/0', '::/0'],
+        }
+      ];
       if (n.dns != null) ob['local_address'] = ['10.0.0.2/32'];
       return ob;
     }
@@ -118,11 +145,12 @@ class ConfigGenerator {
         if (n.alpn != null && n.alpn!.isNotEmpty) 'alpn': n.alpn,
         if (n.fingerprint != null && n.fingerprint!.isNotEmpty)
           'utls': {'enabled': true, 'fingerprint': n.fingerprint},
-        if (n.security == Security.reality) 'reality': {
-          'enabled': true,
-          'public_key': n.publicKey,
-          'short_id': n.shortId ?? '',
-        },
+        if (n.security == Security.reality)
+          'reality': {
+            'enabled': true,
+            'public_key': n.publicKey,
+            'short_id': n.shortId ?? '',
+          },
       };
     }
 
@@ -132,9 +160,14 @@ class ConfigGenerator {
 
     // Mux only for TCP-based protocols
     if (mux &&
-        ![Protocol.hysteria2, Protocol.tuic, Protocol.wireguard].contains(n.protocol) &&
+        ![Protocol.hysteria2, Protocol.tuic, Protocol.wireguard]
+            .contains(n.protocol) &&
         n.transport != Transport.quic) {
-      ob['multiplex'] = {'enabled': true, 'protocol': 'h2mux', 'max_streams': 8};
+      ob['multiplex'] = {
+        'enabled': true,
+        'protocol': 'h2mux',
+        'max_streams': 8
+      };
     }
 
     switch (n.protocol) {
@@ -207,9 +240,15 @@ class ConfigGenerator {
         {'protocol': 'dns', 'outbound': 'dns-out'},
         {'ip_is_private': true, 'outbound': 'direct'},
         if (isRule) ...[
-          {'rule_set': ['geoip-cn', 'geosite-cn'], 'outbound': 'direct'},
+          {
+            'rule_set': ['geoip-cn', 'geosite-cn'],
+            'outbound': 'direct'
+          },
           if (blockAds)
-            {'rule_set': ['geosite-category-ads-all'], 'outbound': 'block'},
+            {
+              'rule_set': ['geosite-category-ads-all'],
+              'outbound': 'block'
+            },
         ],
       ],
       'rule_set': isRule
@@ -218,7 +257,8 @@ class ConfigGenerator {
                 'tag': 'geoip-cn',
                 'type': 'remote',
                 'format': 'binary',
-                'url': 'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
+                'url':
+                    'https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs',
                 'download_detour': 'direct',
                 'update_interval': '7d',
               },
@@ -226,7 +266,8 @@ class ConfigGenerator {
                 'tag': 'geosite-cn',
                 'type': 'remote',
                 'format': 'binary',
-                'url': 'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
+                'url':
+                    'https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs',
                 'download_detour': 'direct',
                 'update_interval': '7d',
               },

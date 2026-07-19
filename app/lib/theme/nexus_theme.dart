@@ -101,7 +101,7 @@ abstract final class NexusTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: dark ? Colors.white.withOpacity(0.04) : Colors.black.withOpacity(0.04),
+        fillColor: dark ? NexusColors.surfaceLift : const Color(0xFFE4ECF0),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -143,7 +143,7 @@ abstract final class NexusTheme {
   }
 }
 
-/// Atmospheric scaffold background used across the app.
+/// Solid themed scaffold background used across the app.
 class NexusAtmosphere extends StatelessWidget {
   final Widget child;
   const NexusAtmosphere({super.key, required this.child});
@@ -151,59 +151,9 @@ class NexusAtmosphere extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: dark
-              ? const [NexusColors.bgDeep, NexusColors.bgMid, Color(0xFF0E171C)]
-              : const [Color(0xFFF4F8FA), Color(0xFFE8F0F3), Color(0xFFDDE8ED)],
-        ),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            top: -120,
-            right: -80,
-            child: IgnorePointer(
-              child: Container(
-                width: 340,
-                height: 340,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      NexusColors.accent.withOpacity(dark ? 0.14 : 0.10),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -160,
-            left: -100,
-            child: IgnorePointer(
-              child: Container(
-                width: 380,
-                height: 380,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      NexusColors.accentDeep.withOpacity(dark ? 0.18 : 0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          child,
-        ],
-      ),
+    return ColoredBox(
+      color: dark ? NexusColors.bgDeep : NexusColors.lightBg,
+      child: child,
     );
   }
 }

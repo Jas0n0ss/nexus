@@ -50,7 +50,7 @@ lipo -create -output assets/cores/sing-box \
 
 # iOS (arm64 only — cross-compiled for device)
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-ios.tar.gz | tar xz
-cp sing-box-1.9.3-ios/sing-box ios/NexusVPNExtension/sing-box
+cp sing-box-1.9.3-ios/sing-box ios/NexusExtension/sing-box
 
 # Android — note release arch names differ from ABI folders
 mkdir -p android/app/src/main/assets/cores
@@ -114,7 +114,7 @@ flutter build ios --release
 # Archive and submit via Xcode Organizer or:
 xcodebuild -workspace ios/Runner.xcworkspace \
   -scheme Runner -configuration Release \
-  -archivePath build/NexusVPN.xcarchive archive
+  -archivePath build/Nexus.xcarchive archive
 ```
 
 **Required Capabilities:**
@@ -150,11 +150,11 @@ flutter build apk --release --split-per-abi
 ```bash
 # Build release EXE
 flutter build windows --release
-# Output: build/windows/x64/runner/Release/nexus_vpn.exe
+# Output: build/windows/x64/runner/Release/nexus.exe
 
 # Create installer with Inno Setup:
-iscc windows/installer/nexus-vpn.iss
-# Output: build/NexusVPN-Setup.exe
+iscc windows/installer/nexus.iss
+# Output: build/Nexus-Setup.exe
 
 # Or publish to winget (after release):
 # Update manifests in microsoft/winget-pkgs
@@ -162,7 +162,7 @@ iscc windows/installer/nexus-vpn.iss
 
 **Run as admin** is required for WinTUN driver access. The app automatically requests elevation via a manifest:
 ```xml
-<!-- windows/runner/nexus_vpn.exe.manifest -->
+<!-- windows/runner/nexus.exe.manifest -->
 <requestedExecutionLevel level="requireAdministrator"/>
 ```
 
@@ -170,14 +170,14 @@ iscc windows/installer/nexus-vpn.iss
 
 ### macOS — Homebrew Cask
 ```ruby
-# Formula: nexus-vpn.rb
-cask "nexus-vpn" do
+# Formula: nexus.rb
+cask "nexus" do
   version "1.0.0"
   sha256 "..."
-  url "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-1.0.0.dmg"
+  url "https://github.com/Jas0n0ss/nexus/releases/download/v1.0.0/Nexus-1.0.0-macos.dmg"
   name "Nexus"
   desc "Cross-platform proxy client supporting VLESS/Hysteria2/TUIC"
-  homepage "https://github.com/yourorg/nexus-vpn"
+  homepage "https://github.com/Jas0n0ss/nexus"
   app "Nexus.app"
 end
 ```
@@ -191,7 +191,7 @@ PackageName: Nexus
 Installers:
   - Architecture: x64
     InstallerType: inno
-    InstallerUrl: https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-Setup.exe
+    InstallerUrl: https://github.com/Jas0n0ss/nexus/releases/download/v1.0.0/Nexus-1.0.0-windows-setup.exe
 ```
 
 ### Windows — Scoop
@@ -199,8 +199,8 @@ Installers:
 {
   "version": "1.0.0",
   "description": "Nexus — cross-platform proxy client",
-  "url": "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-portable.zip",
-  "bin": "nexus_vpn.exe"
+  "url": "https://github.com/Jas0n0ss/nexus/releases/download/v1.0.0/Nexus-1.0.0-windows-portable.zip",
+  "bin": "Nexus.exe"
 }
 ```
 

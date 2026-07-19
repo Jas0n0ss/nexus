@@ -9,7 +9,8 @@ class SettingsProvider extends ChangeNotifier {
   ThemeMode themeMode = ThemeMode.dark;
   CoreEngine coreEngine = CoreEngine.singbox;
   RouteMode routeMode = RouteMode.rule;
-  bool tunMode = true;
+  /// Desktop TUN needs elevated privileges; default off and fall back to system proxy.
+  bool tunMode = false;
   bool dnsLeakProtection = true;
   bool mux = false;
   bool autoReconnect = true;
@@ -45,7 +46,7 @@ class SettingsProvider extends ChangeNotifier {
     themeMode = ThemeMode.values[p.getInt('themeMode') ?? 1];
     coreEngine = CoreEngine.values[p.getInt('core') ?? 0];
     routeMode = RouteMode.values[p.getInt('route') ?? 0];
-    tunMode = p.getBool('tun') ?? true;
+    tunMode = p.getBool('tun') ?? false;
     dnsLeakProtection = p.getBool('dnsLeak') ?? true;
     mux = p.getBool('mux') ?? false;
     autoReconnect = p.getBool('autoReconnect') ?? true;

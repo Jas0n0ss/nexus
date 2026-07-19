@@ -1,7 +1,7 @@
 # 让安装包被系统信任（代码签名）
 
 > 你在 Mac 上看到的  
-> **「Apple could not verify “nexus_vpn.app” is free of malware…」**  
+> **「Apple could not verify “Nexus.app” is free of malware…」**
 > 是 **Gatekeeper**：无官方 Secrets 时，Release 仅使用 CI 自动生成的
 > **本地代码签名证书**，没有 Apple **Developer ID** 信任链，也没有公证
 >（notarize）。这不是应用损坏，而是系统不信任本地签名发布者。
@@ -30,11 +30,11 @@
 ## 没有证书时：临时打开 macOS 包
 
 1. 打开「系统设置 → 隐私与安全性」  
-2. 或对 `nexus_vpn.app` / DMG 内应用：**右键 → 打开 → 仍要打开**  
+2. 或对 `Nexus.app` / DMG 内应用：**右键 → 打开 → 仍要打开**
 3. 终端（本机一次）：
 
 ```bash
-xattr -cr /Applications/nexus_vpn.app
+xattr -cr /Applications/Nexus.app
 # 或
 sudo spctl --master-disable   # 不推荐长期关闭 Gatekeeper
 ```
@@ -88,7 +88,7 @@ base64 -i DeveloperID.p12 | pbcopy   # 粘贴到 MACOS_CERTIFICATE_BASE64
 | `WINDOWS_CERTIFICATE_BASE64` | `.pfx` 的 base64 |
 | `WINDOWS_CERTIFICATE_PASSWORD` | pfx 密码 |
 
-CI 使用 `signtool` 对 `nexus_vpn.exe`、安装包与便携版内文件签名并加时间戳。
+CI 使用 `signtool` 对 `Nexus.exe`、安装包与便携版内文件签名并加时间戳。
 
 ---
 
@@ -136,10 +136,10 @@ AppImage / deb / rpm 默认无 macOS/Windows 那种强制弹窗。
 验证 macOS 是否已公证：
 
 ```bash
-spctl -a -vv /Applications/nexus_vpn.app
+spctl -a -vv /Applications/Nexus.app
 # 期望：accepted / source=Notarized Developer ID
 
-stapler validate NexusVPN-*-macos.dmg
+stapler validate Nexus-*-macos.dmg
 ```
 
 ---

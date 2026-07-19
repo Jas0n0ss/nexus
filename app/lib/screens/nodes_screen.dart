@@ -16,7 +16,7 @@ class NodesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
@@ -98,7 +98,9 @@ class _GroupBar extends StatelessWidget {
                     ? NexusColors.accent.withOpacity(0.45)
                     : NexusColors.line,
               ),
-              backgroundColor: Colors.transparent,
+              backgroundColor: active
+                  ? NexusColors.surfaceLift
+                  : Theme.of(context).scaffoldBackgroundColor,
             ),
           );
         }).toList(),

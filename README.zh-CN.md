@@ -95,6 +95,7 @@ cd app && flutter pub get && flutter run
 | [app/BUILD.md](app/BUILD.md) | 构建与内核 |
 | [docs/TRUSTED_BUILDS.md](docs/TRUSTED_BUILDS.md) | 可信包所需 Secrets |
 | [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | 签名与公证 |
+| [docs/E2E_TESTING.md](docs/E2E_TESTING.md) | 解析、核心配置与真实连通性 CI |
 | [STRUCTURE.md](STRUCTURE.md) | 目录结构 |
 | [nexus-preview.html](nexus-preview.html) | 界面静态预览 |
 

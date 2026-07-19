@@ -1,5 +1,5 @@
 ; Nexus — Inno Setup 6 Installer Script
-; Usage: iscc /DAppVersion=1.0.0 nexus-vpn.iss
+; Usage: iscc /DAppVersion=1.0.0 nexus.iss
 ; Paths are relative to this file: app/windows/installer/
 
 #ifndef AppVersion
@@ -9,7 +9,7 @@
 #define AppName      "Nexus"
 #define AppPublisher "Nexus Team"
 #define AppURL       "https://github.com/Jas0n0ss/nexus"
-#define AppExeName   "nexus_vpn.exe"
+#define AppExeName   "Nexus.exe"
 #define AppId        "{{8A3B2F1C-4E5D-6F7A-8B9C-0D1E2F3A4B5C}"
 ; From app/windows/installer/ → app/build/windows/x64/runner/Release
 #define BuildDir     "..\..\build\windows\x64\runner\Release"

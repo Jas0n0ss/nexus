@@ -167,6 +167,48 @@ jobs:
         run: flutter test --no-pub --reporter=expanded
 
 # ══════════════════════════════════════════════════════════════════════════════
+# 2b. App/Core Smoke — parser → config → sing-box check → optional live probe
+# ══════════════════════════════════════════════════════════════════════════════
+  app-smoke:
+    name: App / Core Smoke
+    runs-on: ubuntu-latest
+    needs: version
+    if: needs.version.outputs.skip != 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        working-directory: app
+        run: flutter pub get
+
+      - name: Validate app config and connectivity
+        working-directory: app
+        env:
+          # Store the real node URI as a repository Secret; never commit it.
+          NEXUS_E2E_TEST_URI: ${{ secrets.NEXUS_E2E_TEST_URI }}
+        run: |
+          chmod +x scripts/app_smoke_test.sh
+          scripts/app_smoke_test.sh
+
+      - name: Upload smoke diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-smoke-diagnostics
+          # Never upload generated configs: they contain the secret node UUID.
+          path: app/build/app-smoke/sing-box.log
+          if-no-files-found: ignore
+          retention-days: 3
+
+# ══════════════════════════════════════════════════════════════════════════════
 # 3. Android — APK (split ABI) + AAB
 # ══════════════════════════════════════════════════════════════════════════════
   build-android:
@@ -215,7 +257,7 @@ jobs:
           rm -rf android ios macos windows linux
           flutter create \
             --org com.nexusvpn \
-            --project-name nexus_vpn \
+            --project-name nexus \
             --platforms=android,ios,linux,macos,windows \
             --no-pub \
             .
@@ -444,7 +486,7 @@ jobs:
           rm -rf android ios macos windows linux
           flutter create \
             --org com.nexusvpn \
-            --project-name nexus_vpn \
+            --project-name nexus \
             --platforms=android,ios,linux,macos,windows \
             --no-pub \
             .
@@ -488,7 +530,7 @@ jobs:
 
       # ── AppImage ────────────────────────────────────────────────────────────
       # Flutter Linux bundle structure:
-      #   bundle/nexus_vpn        ← ELF executable
+      #   bundle/nexus            ← ELF executable
       #   bundle/data/            ← Flutter assets
       #   bundle/lib/             ← .so files (libflutter_linux_gtk.so, libapp.so …)
       - name: Package AppImage
@@ -499,8 +541,8 @@ jobs:
           mkdir -p dist AppDir/usr/{bin,lib,share/{applications,icons/hicolor/512x512/apps}}
 
           # Executable
-          cp "${BUNDLE}/nexus_vpn" AppDir/usr/bin/nexus_vpn
-          chmod +x AppDir/usr/bin/nexus_vpn
+          cp "${BUNDLE}/nexus" AppDir/usr/bin/nexus
+          chmod +x AppDir/usr/bin/nexus
 
           # Flutter data directory must sit next to the executable
           [ -d "${BUNDLE}/data" ] && cp -r "${BUNDLE}/data" AppDir/usr/bin/data
@@ -516,8 +558,8 @@ jobs:
             # 1×1 transparent PNG as placeholder
             printf '\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82' > "$ICON"
           fi
-          cp "$ICON" AppDir/usr/share/icons/hicolor/512x512/apps/nexus-vpn.png
-          cp "$ICON" AppDir/nexus-vpn.png   # AppImage root icon
+          cp "$ICON" AppDir/usr/share/icons/hicolor/512x512/apps/nexus.png
+          cp "$ICON" AppDir/nexus.png   # AppImage root icon
 
           # Desktop file — must appear at AppDir root (for appimagetool).
           # Write without leading spaces (indented heredocs break desktop parsers).
@@ -525,12 +567,12 @@ jobs:
             '[Desktop Entry]' \
             'Type=Application' \
             'Name=Nexus' \
-            'Exec=nexus_vpn' \
-            'Icon=nexus-vpn' \
+            'Exec=nexus' \
+            'Icon=nexus' \
             'Categories=Network;' \
-            'X-AppImage-Name=nexus-vpn' \
-            > AppDir/nexus-vpn.desktop
-          cp AppDir/nexus-vpn.desktop AppDir/usr/share/applications/nexus-vpn.desktop
+            'X-AppImage-Name=nexus' \
+            > AppDir/nexus.desktop
+          cp AppDir/nexus.desktop AppDir/usr/share/applications/nexus.desktop
 
           # AppRun — sets LD_LIBRARY_PATH so Flutter .so files are found
           printf '%s\n' \
@@ -539,7 +581,7 @@ jobs:
             'HERE="${SELF%/*}"' \
             'export LD_LIBRARY_PATH="${HERE}/usr/lib:${LD_LIBRARY_PATH:-}"' \
             'export XDG_DATA_DIRS="${HERE}/usr/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"' \
-            'exec "${HERE}/usr/bin/nexus_vpn" "$@"' \
+            'exec "${HERE}/usr/bin/nexus" "$@"' \
             > AppDir/AppRun
           chmod +x AppDir/AppRun
 
@@ -558,43 +600,43 @@ jobs:
 
           mkdir -p \
             "${DEB}/DEBIAN" \
-            "${DEB}/usr/lib/nexus-vpn" \
+            "${DEB}/usr/lib/nexus" \
             "${DEB}/usr/bin" \
             "${DEB}/usr/share/applications" \
             "${DEB}/usr/share/icons/hicolor/512x512/apps"
 
-          # Application files — placed in /usr/lib/nexus-vpn/
-          cp "${BUNDLE}/nexus_vpn"           "${DEB}/usr/lib/nexus-vpn/"
-          chmod +x "${DEB}/usr/lib/nexus-vpn/nexus_vpn"
-          [ -d "${BUNDLE}/data" ] && cp -r "${BUNDLE}/data" "${DEB}/usr/lib/nexus-vpn/"
-          [ -d "${BUNDLE}/lib"  ] && cp -r "${BUNDLE}/lib/." "${DEB}/usr/lib/nexus-vpn/"
-          find "${BUNDLE}" -maxdepth 1 -name "*.so*" -exec cp {} "${DEB}/usr/lib/nexus-vpn/" \;
+          # Application files — placed in /usr/lib/nexus/
+          cp "${BUNDLE}/nexus"           "${DEB}/usr/lib/nexus/"
+          chmod +x "${DEB}/usr/lib/nexus/nexus"
+          [ -d "${BUNDLE}/data" ] && cp -r "${BUNDLE}/data" "${DEB}/usr/lib/nexus/"
+          [ -d "${BUNDLE}/lib"  ] && cp -r "${BUNDLE}/lib/." "${DEB}/usr/lib/nexus/"
+          find "${BUNDLE}" -maxdepth 1 -name "*.so*" -exec cp {} "${DEB}/usr/lib/nexus/" \;
 
           # Thin launcher in /usr/bin/
-          cat > "${DEB}/usr/bin/nexus-vpn" << 'WRAPPER'
+          cat > "${DEB}/usr/bin/nexus" << 'WRAPPER'
           #!/bin/sh
-          exec /usr/lib/nexus-vpn/nexus_vpn "$@"
+          exec /usr/lib/nexus/nexus "$@"
           WRAPPER
-          chmod +x "${DEB}/usr/bin/nexus-vpn"
+          chmod +x "${DEB}/usr/bin/nexus"
 
           # Icon
           ICON="app/assets/icons/app_icon_512.png"
-          [ -f "$ICON" ] && cp "$ICON" "${DEB}/usr/share/icons/hicolor/512x512/apps/nexus-vpn.png"
+          [ -f "$ICON" ] && cp "$ICON" "${DEB}/usr/share/icons/hicolor/512x512/apps/nexus.png"
 
           # .desktop (no leading whitespace)
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \
             'Name=Nexus' \
-            'Exec=nexus-vpn' \
-            'Icon=nexus-vpn' \
+            'Exec=nexus' \
+            'Icon=nexus' \
             'Categories=Network;' \
-            > "${DEB}/usr/share/applications/nexus-vpn.desktop"
+            > "${DEB}/usr/share/applications/nexus.desktop"
 
           # control — dpkg requires zero leading whitespace on field lines;
           # description continuation lines have exactly 1 leading space.
           {
-            echo "Package: nexus-vpn"
+            echo "Package: nexus"
             echo "Version: ${VERSION}"
             echo "Section: net"
             echo "Priority: optional"
@@ -623,8 +665,8 @@ jobs:
           TOP="$(pwd)/rpmbuild"
           mkdir -p "${TOP}"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
 
-          cat > "${TOP}/SPECS/nexus-vpn.spec" << EOF
-          Name: nexus-vpn
+          cat > "${TOP}/SPECS/nexus.spec" << EOF
+          Name: nexus
           Version: ${RPM_VERSION}
           Release: 1
           Summary: Cross-platform VPN client (VLESS/VMess/Trojan/SS/Hysteria2/TUIC/WireGuard)
@@ -646,13 +688,13 @@ jobs:
           cp -a ${GITHUB_WORKSPACE}/deb-staging/usr %{buildroot}/
 
           %files
-          /usr/lib/nexus-vpn
-          /usr/bin/nexus-vpn
-          /usr/share/applications/nexus-vpn.desktop
-          /usr/share/icons/hicolor/512x512/apps/nexus-vpn.png
+          /usr/lib/nexus
+          /usr/bin/nexus
+          /usr/share/applications/nexus.desktop
+          /usr/share/icons/hicolor/512x512/apps/nexus.png
           EOF
 
-          rpmbuild --define "_topdir ${TOP}" --target x86_64 -bb "${TOP}/SPECS/nexus-vpn.spec"
+          rpmbuild --define "_topdir ${TOP}" --target x86_64 -bb "${TOP}/SPECS/nexus.spec"
           # Arch subdirectory name can vary — locate the built rpm robustly
           RPM_FILE=$(find "${TOP}/RPMS" -name '*.rpm' | head -1)
           [ -n "$RPM_FILE" ] || { echo "❌ rpmbuild produced no .rpm"; exit 1; }
@@ -672,17 +714,17 @@ jobs:
           chmod +x "$AI"
           rm -rf /tmp/ai-check && mkdir /tmp/ai-check
           cd /tmp/ai-check && "$GITHUB_WORKSPACE/$AI" --appimage-extract >/dev/null
-          test -x /tmp/ai-check/squashfs-root/usr/bin/nexus_vpn
+          test -x /tmp/ai-check/squashfs-root/usr/bin/nexus
           test -f /tmp/ai-check/squashfs-root/usr/lib/libflutter_linux_gtk.so
           test -f /tmp/ai-check/squashfs-root/usr/bin/data/flutter_assets/AssetManifest.json
           echo "✅ AppImage structure OK"
 
           # .deb: control + binary present
-          dpkg-deb -I "$GITHUB_WORKSPACE/$DEB" | grep -q 'Package: nexus-vpn'
+          dpkg-deb -I "$GITHUB_WORKSPACE/$DEB" | grep -q 'Package: nexus'
           rm -rf /tmp/deb-check && mkdir /tmp/deb-check
           dpkg-deb -x "$GITHUB_WORKSPACE/$DEB" /tmp/deb-check
-          test -x /tmp/deb-check/usr/lib/nexus-vpn/nexus_vpn
-          test -x /tmp/deb-check/usr/bin/nexus-vpn
+          test -x /tmp/deb-check/usr/lib/nexus/nexus
+          test -x /tmp/deb-check/usr/bin/nexus
           echo "✅ deb structure OK"
 
           # .rpm: file magic + contains payload files
@@ -744,7 +786,7 @@ jobs:
           }
           flutter create `
             --org com.nexusvpn `
-            --project-name nexus_vpn `
+            --project-name nexus `
             --platforms=android,ios,linux,macos,windows `
             --no-pub `
             .
@@ -755,6 +797,16 @@ jobs:
           if (Test-Path "$backup\runner\vpn_channel.cpp") {
             Copy-Item "$backup\runner\vpn_channel.cpp" "windows\runner\" -Force
           }
+          Copy-Item "packaging\windows\app_icon.ico" `
+            "windows\runner\resources\app_icon.ico" -Force
+          # Keep the executable filename for compatibility; normalize all
+          # user-visible Windows metadata to Nexus.
+          $rc = "windows\runner\Runner.rc"
+          (Get-Content $rc) `
+            -replace 'VALUE \"FileDescription\", \".*\"', 'VALUE \"FileDescription\", \"Nexus\"' `
+            -replace 'VALUE \"InternalName\", \".*\"', 'VALUE \"InternalName\", \"Nexus\"' `
+            -replace 'VALUE \"ProductName\", \".*\"', 'VALUE \"ProductName\", \"Nexus\"' |
+            Set-Content $rc
           Write-Host "✅ Windows scaffold created; installer script restored:"
           Get-ChildItem windows\installer\ | Format-Table Name
 
@@ -799,6 +851,13 @@ jobs:
       - name: flutter build windows --release
         working-directory: app
         run: flutter build windows --release --no-pub
+
+      - name: Normalize Windows executable name
+        shell: pwsh
+        run: |
+          $src = "app/build/windows/x64/runner/Release"
+          Move-Item "$src/nexus.exe" "$src/nexus.tmp.exe" -Force
+          Move-Item "$src/nexus.tmp.exe" "$src/Nexus.exe" -Force
 
       # Authenticode-sign binaries when WINDOWS_CERTIFICATE_* secrets are set.
       # Without them, SmartScreen will show "Unknown publisher" — see docs/CODE_SIGNING.md.
@@ -885,7 +944,7 @@ jobs:
           & $iscc `
             "/DAppVersion=$ver" `
             "/O$((Resolve-Path dist).Path)" `
-            "app/windows/installer/nexus-vpn.iss"
+            "app/windows/installer/nexus.iss"
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Sign Windows installer
@@ -928,8 +987,8 @@ jobs:
         run: |
           $ver = "${{ needs.version.outputs.version }}"
           $src = "app/build/windows/x64/runner/Release"
-          if (-not (Test-Path "$src/nexus_vpn.exe")) {
-            throw "missing nexus_vpn.exe in $src"
+          if (-not (Test-Path "$src/Nexus.exe")) {
+            throw "missing Nexus.exe in $src"
           }
           if (-not (Test-Path "$src/flutter_windows.dll")) {
             throw "missing flutter_windows.dll in $src"
@@ -940,7 +999,7 @@ jobs:
           # Ensure version.json exists (some Flutter builds omit it from zip)
           $vj = "$src/data/flutter_assets/version.json"
           if (-not (Test-Path $vj)) {
-            "{`"app_name`":`"nexus_vpn`",`"version`":`"$ver`",`"build_number`":`"0`",`"package_name`":`"com.nexusvpn.nexus_vpn`"}" |
+            "{`"app_name`":`"Nexus`",`"version`":`"$ver`",`"build_number`":`"0`",`"package_name`":`"com.nexusvpn.nexus`"}" |
               Set-Content -Path $vj -Encoding utf8
           }
           # Bundle sing-box and WinTUN next to the exe (and under cores/ for lookup)
@@ -968,7 +1027,7 @@ jobs:
           $archive = [System.IO.Compression.ZipFile]::OpenRead((Resolve-Path $zip).Path)
           $names = $archive.Entries | ForEach-Object { $_.FullName }
           $archive.Dispose()
-          foreach ($need in @("nexus_vpn.exe", "flutter_windows.dll", "wintun.dll", "sing-box.exe", "data/flutter_assets/AssetManifest.json")) {
+          foreach ($need in @("Nexus.exe", "flutter_windows.dll", "wintun.dll", "sing-box.exe", "data/flutter_assets/AssetManifest.json")) {
             if (-not ($names -contains $need -or ($names | Where-Object { $_ -eq $need -or $_.EndsWith("/$need") }))) {
               # Zip entries may use backslash
               if (-not ($names | Where-Object { $_ -replace '\\','/' -eq $need })) {
@@ -1016,20 +1075,22 @@ jobs:
         working-directory: app
         run: |
           set -euo pipefail
-          mkdir -p /tmp/fb/ios/NexusVPNExtension
-          [ -f ios/NexusVPNExtension/PacketTunnelProvider.swift ] && \
-            cp ios/NexusVPNExtension/PacketTunnelProvider.swift \
-               /tmp/fb/ios/NexusVPNExtension/ || true
+          mkdir -p /tmp/fb/ios/NexusExtension
+          [ -f ios/NexusExtension/PacketTunnelProvider.swift ] && \
+            cp ios/NexusExtension/PacketTunnelProvider.swift \
+               /tmp/fb/ios/NexusExtension/ || true
           rm -rf android ios macos windows linux
           flutter create \
             --org com.nexusvpn \
-            --project-name nexus_vpn \
+            --project-name nexus \
             --platforms=android,ios,linux,macos,windows \
             --no-pub \
             .
           # Restore custom Network Extension file
-          mkdir -p ios/NexusVPNExtension
+          mkdir -p ios/NexusExtension
           cp -r /tmp/fb/ios/. ios/ 2>/dev/null || true
+          chmod +x scripts/apply_apple_branding.sh
+          scripts/apply_apple_branding.sh
           echo "✅ macOS + iOS scaffold created"
           ls macos/ ios/
 
@@ -1175,8 +1236,8 @@ jobs:
       # ── iOS build ──────────────────────────────────────────────────────────
       - name: Copy sing-box into iOS Network Extension
         run: |
-          mkdir -p app/ios/NexusVPNExtension
-          cp app/assets/cores/sing-box app/ios/NexusVPNExtension/sing-box
+          mkdir -p app/ios/NexusExtension
+          cp app/assets/cores/sing-box app/ios/NexusExtension/sing-box
 
       - name: Import iOS certificates (signed build — requires secrets)
         if: ${{ env.HAS_IOS_CERT == 'true' }}
@@ -1277,7 +1338,7 @@ jobs:
   all-builds:
     name: All Builds
     runs-on: ubuntu-latest
-    needs: [version, lint, test, build-android, build-linux, build-windows, build-macos-ios]
+    needs: [version, lint, test, app-smoke, build-android, build-linux, build-windows, build-macos-ios]
     if: always() && needs.version.outputs.skip != 'true'
     steps:
       - name: Evaluate build results
@@ -1286,6 +1347,7 @@ jobs:
           declare -A RESULTS=(
             [lint]="${{ needs.lint.result }}"
             [test]="${{ needs.test.result }}"
+            [app-smoke]="${{ needs.app-smoke.result }}"
             [android]="${{ needs.build-android.result }}"
             [linux]="${{ needs.build-linux.result }}"
             [windows]="${{ needs.build-windows.result }}"

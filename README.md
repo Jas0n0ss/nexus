@@ -96,6 +96,7 @@ cd app && flutter pub get && flutter run
 | [app/BUILD.md](app/BUILD.md) | Build matrix & cores |
 | [docs/TRUSTED_BUILDS.md](docs/TRUSTED_BUILDS.md) | Secrets for trusted packages |
 | [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | Developer ID / Authenticode |
+| [docs/E2E_TESTING.md](docs/E2E_TESTING.md) | Parser, core config, and live connectivity CI |
 | [STRUCTURE.md](STRUCTURE.md) | Repository map |
 | [nexus-preview.html](nexus-preview.html) | Static UI preview |
 

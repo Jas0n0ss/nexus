@@ -89,7 +89,7 @@ class _ImportScreenState extends State<ImportScreen> {
   Widget build(BuildContext context) {
     final nodes = context.watch<NodesProvider>();
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
@@ -294,7 +294,9 @@ class _ModeTab extends StatelessWidget {
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: active ? NexusColors.accent.withOpacity(0.12) : Colors.transparent,
+          color: active
+              ? NexusColors.surfaceLift
+              : Theme.of(context).scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: active ? NexusColors.accent.withOpacity(0.45) : NexusColors.line,

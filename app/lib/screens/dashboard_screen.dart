@@ -18,7 +18,7 @@ class DashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
@@ -70,18 +70,26 @@ class _HeroConnect extends StatelessWidget {
     final node = nodes.selected;
     final connected = proxy.isConnected;
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final isError = proxy.state == SessionState.error;
+    final headline = proxy.state == SessionState.connecting
+        ? '正在连接…'
+        : proxy.state == SessionState.disconnecting
+            ? '正在断开…'
+            : isError
+                ? '连接异常'
+                : connected
+                    ? (proxy.externalIp ?? '获取出口…')
+                    : (nodes.isEmpty ? '先导入节点' : '准备就绪');
+
     return NexusSurface(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
-      gradient: LinearGradient(
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-        colors: [
-          NexusColors.accent.withOpacity(0.14),
-          NexusColors.surface.withOpacity(0.9),
-          NexusColors.accentDeep.withOpacity(0.10),
-        ],
-      ),
-      borderColor: NexusColors.accent.withOpacity(0.28),
+      color: dark ? NexusColors.surfaceLift : NexusColors.lightSurface,
+      borderColor: isError
+          ? NexusColors.danger.withOpacity(0.55)
+          : connected
+              ? NexusColors.accent.withOpacity(0.45)
+              : (dark ? NexusColors.line : const Color(0x33102027)),
       child: Row(
         children: [
           Expanded(
@@ -97,7 +105,7 @@ class _HeroConnect extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: proxy.state == SessionState.error
+                        color: isError
                             ? NexusColors.danger
                             : connected
                                 ? NexusColors.ok
@@ -110,21 +118,24 @@ class _HeroConnect extends StatelessWidget {
                           ? '连接中'
                           : proxy.state == SessionState.disconnecting
                               ? '断开中'
-                              : proxy.state == SessionState.error
+                              : isError
                                   ? '失败'
                                   : connected
                                       ? '已连接'
                                       : '未连接',
-                      style: Theme.of(context).textTheme.titleMedium,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: isError ? NexusColors.danger : null,
+                          ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  connected
-                      ? (proxy.externalIp ?? '获取出口…')
-                      : (nodes.isEmpty ? '先导入节点' : '准备就绪'),
-                  style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 34),
+                  headline,
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        fontSize: 34,
+                        color: isError ? NexusColors.danger : null,
+                      ),
                 ),
                 const SizedBox(height: 8),
                 Text(
@@ -138,11 +149,11 @@ class _HeroConnect extends StatelessWidget {
                   'TUN ${settings.tunMode ? "开" : "关"}  ·  ${settings.routeMode.name}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if (proxy.state == SessionState.error && proxy.lastError != null) ...[
+                if (isError && proxy.lastError != null) ...[
                   const SizedBox(height: 10),
                   Text(
                     proxy.lastError!,
-                    maxLines: 2,
+                    maxLines: 3,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: NexusColors.danger, fontSize: 12),
                   ),

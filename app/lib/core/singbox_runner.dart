@@ -52,10 +52,16 @@ class SingboxRunner {
       throw Exception('节点服务器地址为空，无法连接');
     }
 
-    final config = ConfigGenerator.generate(node, settings: settings);
+    final tmpDir = await getTemporaryDirectory();
+    final cachePath = '${tmpDir.path}/nexus-cache.db';
+    var wantTun = settings?.tunMode ?? true;
+    final config = ConfigGenerator.generate(
+      node,
+      settings: settings,
+      cachePath: cachePath,
+    );
     final configJson = const JsonEncoder.withIndent('  ').convert(config);
 
-    final tmpDir = await getTemporaryDirectory();
     final configFile = File('${tmpDir.path}/nexus-singbox.json');
     await configFile.writeAsString(configJson);
     _configPath = configFile.path;
@@ -85,43 +91,75 @@ class SingboxRunner {
       _logStream?.add('[ERR] $msg');
       // Only allow fake simulator in explicit debug + flag
       if (kDebugMode &&
-          const bool.fromEnvironment('NEXUS_ALLOW_SIMULATOR', defaultValue: false)) {
+          const bool.fromEnvironment('NEXUS_ALLOW_SIMULATOR',
+              defaultValue: false)) {
         _logStream?.add('[WARN] 调试模拟器模式已启用（流量不会真正代理）');
         return;
       }
       throw Exception(msg);
     }
 
-    _logStream?.add('[INFO] 启动核心: $binary');
-    _process = await Process.start(
-      binary,
-      ['run', '-c', configFile.path],
-      runInShell: false,
-      workingDirectory: File(binary).parent.path,
-    );
+    final startupErrors = <String>[];
+    Future<int> launchCore() async {
+      startupErrors.clear();
+      _logStream?.add('[INFO] 启动核心: $binary');
+      final process = await Process.start(
+        binary,
+        ['run', '-c', configFile.path],
+        runInShell: false,
+        workingDirectory: File(binary).parent.path,
+      );
+      _process = process;
 
-    _process!.stdout.transform(utf8.decoder).listen((line) {
-      for (final l in line.split('\n')) {
-        final t = l.trim();
-        if (t.isNotEmpty) _logStream?.add(t);
-      }
-    });
-    _process!.stderr.transform(utf8.decoder).listen((line) {
-      for (final l in line.split('\n')) {
-        final t = l.trim();
-        if (t.isNotEmpty) _logStream?.add('[ERR] $t');
-      }
-    });
+      process.stdout.transform(utf8.decoder).listen((line) {
+        for (final l in line.split('\n')) {
+          final t = l.trim();
+          if (t.isNotEmpty) _logStream?.add(t);
+        }
+      });
+      process.stderr.transform(utf8.decoder).listen((line) {
+        for (final l in line.split('\n')) {
+          final t = l.trim();
+          if (t.isNotEmpty) {
+            startupErrors.add(t);
+            _logStream?.add('[ERR] $t');
+          }
+        }
+      });
 
-    // Fail fast if process exits immediately
-    await Future.delayed(const Duration(milliseconds: 400));
-    final exitCode = await _process!.exitCode.timeout(
-      const Duration(milliseconds: 50),
-      onTimeout: () => -999,
-    );
+      await Future.delayed(const Duration(milliseconds: 450));
+      return process.exitCode.timeout(
+        const Duration(milliseconds: 80),
+        onTimeout: () => -999,
+      );
+    }
+
+    var exitCode = await launchCore();
+    final desktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    if (exitCode != -999 && wantTun && desktop) {
+      _process = null;
+      wantTun = false;
+      _logStream?.add(
+        '[WARN] TUN 启动失败，自动切换到系统代理模式（无需管理员权限）',
+      );
+      final fallback = ConfigGenerator.generate(
+        node,
+        settings: settings,
+        tunMode: false,
+        cachePath: cachePath,
+      );
+      await configFile.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(fallback),
+      );
+      exitCode = await launchCore();
+    }
+
     if (exitCode != -999) {
       _process = null;
-      throw Exception('sing-box 启动后立即退出 (code=$exitCode)。请检查配置与权限（TUN 需管理员）。');
+      final detail = startupErrors.isEmpty ? '无错误输出' : startupErrors.last;
+      throw Exception(
+        'sing-box 启动后立即退出 (code=$exitCode)：$detail',
+      );
     }
 
     _exitWatcher = Timer.periodic(const Duration(seconds: 2), (_) async {
@@ -139,9 +177,9 @@ class SingboxRunner {
     });
 
     // Desktop system proxy when TUN is off
-    final wantTun = settings?.tunMode ?? true;
     final wantSysProxy = settings?.systemProxy ?? true;
-    if (!wantTun && wantSysProxy &&
+    if (!wantTun &&
+        wantSysProxy &&
         (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
       final ok = await PlatformProxy.setSystemProxy(
         host: '127.0.0.1',
@@ -154,7 +192,9 @@ class SingboxRunner {
         // Fallback: WinINET via netsh (best-effort)
         try {
           await Process.run('netsh', [
-            'winhttp', 'set', 'proxy',
+            'winhttp',
+            'set',
+            'proxy',
             'proxy-server=127.0.0.1:$_mixedPort',
           ]);
           _usingSystemProxy = true;
@@ -167,7 +207,8 @@ class SingboxRunner {
       }
     }
 
-    _logStream?.add('[OK] 已连接 ${node.name}（mixed=$_mixedPort，TUN=${wantTun ? "开" : "关"}，路由=${settings?.routeMode.name ?? "rule"}）');
+    _logStream?.add(
+        '[OK] 已连接 ${node.name}（mixed=$_mixedPort，TUN=${wantTun ? "开" : "关"}，路由=${settings?.routeMode.name ?? "rule"}）');
   }
 
   Future<void> stop() async {
@@ -241,7 +282,8 @@ class SingboxRunner {
     } catch (_) {
       // Clash API may stream forever; ignore and return zeros
     }
-    return CoreStats(uploadMbps: 0, downloadMbps: 0, latencyMs: await _probeLatency());
+    return CoreStats(
+        uploadMbps: 0, downloadMbps: 0, latencyMs: await _probeLatency());
   }
 
   Future<int> _probeLatency() async {
@@ -250,7 +292,8 @@ class SingboxRunner {
       final client = HttpClient();
       client.findProxy = (_) => 'PROXY 127.0.0.1:$_mixedPort';
       client.connectionTimeout = const Duration(seconds: 3);
-      final req = await client.getUrl(Uri.parse('http://cp.cloudflare.com/generate_204'));
+      final req = await client
+          .getUrl(Uri.parse('http://cp.cloudflare.com/generate_204'));
       final resp = await req.close().timeout(const Duration(seconds: 3));
       await resp.drain<void>();
       client.close(force: true);

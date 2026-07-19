@@ -1,4 +1,4 @@
-// NexusVPN — Windows Platform Channel
+// Nexus — Windows Platform Channel
 // Bridges Flutter ↔ WinTUN driver + sing-box process via MethodChannel
 // Requires: WinTUN driver (wintun.dll) and admin elevation
 

@@ -11,7 +11,8 @@ void main() {
       final paths = CoreLocator.candidatePaths(
         exeName: 'sing-box',
         exeDir: '/App/Contents/MacOS',
-        supportDir: '/Users/x/Library/Containers/com.nexusvpn/Data/Library/Application Support',
+        supportDir:
+            '/Users/x/Library/Containers/com.nexusvpn/Data/Library/Application Support',
         isMacOS: true,
         isLinux: false,
         isWindows: false,
@@ -39,7 +40,7 @@ void main() {
     test('linux includes deb flutter_assets layout', () {
       final paths = CoreLocator.candidatePaths(
         exeName: 'sing-box',
-        exeDir: '/usr/lib/nexus-vpn',
+        exeDir: '/usr/lib/nexus',
         supportDir: '/home/u/.local/share',
         isMacOS: false,
         isLinux: true,
@@ -48,7 +49,7 @@ void main() {
       );
       expect(
         paths,
-        contains('/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box'),
+        contains('/usr/lib/nexus/data/flutter_assets/assets/cores/sing-box'),
       );
       expect(paths, contains('/usr/bin/sing-box'));
     });
@@ -57,7 +58,7 @@ void main() {
       final paths = CoreLocator.candidatePaths(
         exeName: 'sing-box',
         exeDir: '/system/bin',
-        supportDir: '/data/user/0/com.nexusvpn.nexus_vpn/files',
+        supportDir: '/data/user/0/com.nexusvpn.nexus/files',
         isMacOS: false,
         isLinux: false,
         isWindows: false,
@@ -65,26 +66,26 @@ void main() {
       );
       expect(
         paths,
-        contains('/data/user/0/com.nexusvpn.nexus_vpn/files/sing-box'),
+        contains('/data/user/0/com.nexusvpn.nexus/files/sing-box'),
       );
       expect(
         paths,
-        contains('/data/data/com.nexusvpn.nexus_vpn/files/sing-box'),
+        contains('/data/data/com.nexusvpn.nexus/files/sing-box'),
       );
     });
 
     test('windows uses .exe name', () {
       final paths = CoreLocator.candidatePaths(
         exeName: 'sing-box.exe',
-        exeDir: r'C:\Program Files\NexusVPN',
+        exeDir: r'C:\Program Files\Nexus',
         supportDir: r'C:\Users\x\AppData\Roaming',
         isMacOS: false,
         isLinux: false,
         isWindows: true,
         isAndroid: false,
       );
-      expect(paths, contains(r'C:\Program Files\NexusVPN\sing-box.exe'));
-      expect(paths, contains(r'C:\Program Files\NexusVPN\cores\sing-box.exe'));
+      expect(paths, contains(r'C:\Program Files\Nexus\sing-box.exe'));
+      expect(paths, contains(r'C:\Program Files\Nexus\cores\sing-box.exe'));
     });
   });
 
@@ -94,7 +95,8 @@ void main() {
       final locator = CoreLocator(
         assetLoader: (key) async {
           expect(key, startsWith('assets/cores/'));
-          return ByteData.sublistView(Uint8List.fromList([0x7f, 0x45, 0x4c, 0x46]));
+          return ByteData.sublistView(
+              Uint8List.fromList([0x7f, 0x45, 0x4c, 0x46]));
         },
         exists: (path) async => written.containsKey(path),
         writeExecutable: (path, bytes) async {

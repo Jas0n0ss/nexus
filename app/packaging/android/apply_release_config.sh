@@ -16,6 +16,11 @@ mkdir -p "$ANDROID/keystore"
 cp -f "$PKG/keystore/nexus-release.p12" "$ANDROID/keystore/nexus-release.p12"
 cp -f "$PKG/key.properties" "$ANDROID/key.properties"
 
+# Use the Nexus routing icon instead of Flutter's default launcher icon.
+mkdir -p "$ANDROID/app/src/main/res/drawable-nodpi"
+cp -f "$ROOT/assets/icons/app_icon_512.png" \
+  "$ANDROID/app/src/main/res/drawable-nodpi/nexus_icon.png"
+
 # ── AndroidManifest.xml: permissions, label, VpnService ───────────────────────
 MANIFEST="$ANDROID/app/src/main/AndroidManifest.xml"
 python3 - <<'PY' "$MANIFEST"
@@ -42,6 +47,19 @@ for p in perms:
 
 # Human-readable app label
 text = re.sub(r'android:label="[^"]*"', 'android:label="Nexus"', text, count=1)
+if 'android:icon=' in text:
+    text = re.sub(
+        r'android:icon="[^"]*"',
+        'android:icon="@drawable/nexus_icon"',
+        text,
+        count=1,
+    )
+else:
+    text = text.replace(
+        '<application',
+        '<application android:icon="@drawable/nexus_icon"',
+        1,
+    )
 
 service = '''
         <service

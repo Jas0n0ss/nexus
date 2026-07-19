@@ -10,7 +10,8 @@ class ParsedResult {
   final List<ProxyNode> nodes;
   final List<String> errors;
   final String? detectedSource;
-  ParsedResult({required this.nodes, required this.errors, this.detectedSource});
+  ParsedResult(
+      {required this.nodes, required this.errors, this.detectedSource});
 
   bool get hasNodes => nodes.isNotEmpty;
 }
@@ -42,7 +43,8 @@ class NodeParser {
           : pathOrUri;
       final file = File(path);
       if (!await file.exists()) {
-        return ParsedResult(nodes: [], errors: ['文件不存在: $path'], detectedSource: null);
+        return ParsedResult(
+            nodes: [], errors: ['文件不存在: $path'], detectedSource: null);
       }
       final content = await file.readAsString();
       final result = await _parseContent(content);
@@ -52,7 +54,8 @@ class NodeParser {
         detectedSource: result.detectedSource ?? '本地文件',
       );
     } catch (e) {
-      return ParsedResult(nodes: [], errors: ['读取文件失败: $e'], detectedSource: null);
+      return ParsedResult(
+          nodes: [], errors: ['读取文件失败: $e'], detectedSource: null);
     }
   }
 
@@ -112,7 +115,9 @@ class NodeParser {
 
     return ParsedResult(
       nodes: [],
-      errors: ['无法识别输入格式（支持 URI / Base64 订阅 / Clash YAML / sing-box JSON / 本地文件）'],
+      errors: [
+        '无法识别输入格式（支持 URI / Base64 订阅 / Clash YAML / sing-box JSON / 本地文件）'
+      ],
       detectedSource: null,
     );
   }
@@ -122,12 +127,15 @@ class NodeParser {
       final resp = await http.get(
         Uri.parse(url),
         headers: const {
-          'User-Agent': 'NexusVPN/1.0',
+          'User-Agent': 'Nexus/1.0',
           'Accept': '*/*',
         },
       ).timeout(const Duration(seconds: 15));
       if (resp.statusCode < 200 || resp.statusCode >= 300) {
-        return ParsedResult(nodes: [], errors: ['HTTP ${resp.statusCode}'], detectedSource: null);
+        return ParsedResult(
+            nodes: [],
+            errors: ['HTTP ${resp.statusCode}'],
+            detectedSource: null);
       }
       // Some panels return UTF-8 bytes as latin1; prefer bodyBytes
       String body;
@@ -139,14 +147,19 @@ class NodeParser {
       final source = _detectSource(url, body);
       final result = await _parseContent(body);
       return ParsedResult(
-        nodes: result.nodes.map((n) => n.copyWith(
-          source: n.source == NodeSource.unknown ? NodeSource.subscription : n.source,
-        )).toList(),
+        nodes: result.nodes
+            .map((n) => n.copyWith(
+                  source: n.source == NodeSource.unknown
+                      ? NodeSource.subscription
+                      : n.source,
+                ))
+            .toList(),
         errors: result.errors,
         detectedSource: source ?? result.detectedSource,
       );
     } catch (e) {
-      return ParsedResult(nodes: [], errors: ['请求失败: $e'], detectedSource: null);
+      return ParsedResult(
+          nodes: [], errors: ['请求失败: $e'], detectedSource: null);
     }
   }
 
@@ -172,8 +185,16 @@ class NodeParser {
       if (raw is! Map) continue;
       final ob = Map<String, dynamic>.from(raw);
       final type = ob['type'] as String? ?? '';
-      if (const {'direct', 'block', 'dns', 'selector', 'urltest', 'echo', 'tor', 'ssh'}
-          .contains(type)) {
+      if (const {
+        'direct',
+        'block',
+        'dns',
+        'selector',
+        'urltest',
+        'echo',
+        'tor',
+        'ssh'
+      }.contains(type)) {
         continue;
       }
       try {
@@ -182,7 +203,8 @@ class NodeParser {
         errors.add('outbound[${ob['tag']}]: $e');
       }
     }
-    return ParsedResult(nodes: nodes, errors: errors, detectedSource: 'sing-box 配置');
+    return ParsedResult(
+        nodes: nodes, errors: errors, detectedSource: 'sing-box 配置');
   }
 
   ParsedResult _parseJsonNodeList(List list) {
@@ -201,7 +223,8 @@ class NodeParser {
         errors.add('json item: $e');
       }
     }
-    return ParsedResult(nodes: nodes, errors: errors, detectedSource: 'JSON 节点列表');
+    return ParsedResult(
+        nodes: nodes, errors: errors, detectedSource: 'JSON 节点列表');
   }
 
   ParsedResult _parseClashYaml(String content) {
@@ -210,12 +233,14 @@ class NodeParser {
     try {
       final doc = loadYaml(content);
       if (doc is! YamlMap && doc is! Map) {
-        return ParsedResult(nodes: [], errors: ['YAML 根节点无效'], detectedSource: 'Clash');
+        return ParsedResult(
+            nodes: [], errors: ['YAML 根节点无效'], detectedSource: 'Clash');
       }
       final root = _yamlToDart(doc) as Map;
       final proxies = root['proxies'] ?? root['Proxy'];
       if (proxies is! List) {
-        return ParsedResult(nodes: [], errors: ['未找到 proxies 列表'], detectedSource: 'Clash');
+        return ParsedResult(
+            nodes: [], errors: ['未找到 proxies 列表'], detectedSource: 'Clash');
       }
       for (final p in proxies) {
         if (p is! Map) continue;
@@ -227,9 +252,11 @@ class NodeParser {
           errors.add('proxy[${p['name']}]: $e');
         }
       }
-      return ParsedResult(nodes: nodes, errors: errors, detectedSource: 'Clash / Meta');
+      return ParsedResult(
+          nodes: nodes, errors: errors, detectedSource: 'Clash / Meta');
     } catch (e) {
-      return ParsedResult(nodes: [], errors: ['Clash YAML 解析失败: $e'], detectedSource: 'Clash');
+      return ParsedResult(
+          nodes: [], errors: ['Clash YAML 解析失败: $e'], detectedSource: 'Clash');
     }
   }
 
@@ -246,7 +273,8 @@ class NodeParser {
 
     Security security = Security.none;
     String? sni = p['sni']?.toString() ?? p['servername']?.toString();
-    String? fingerprint = p['client-fingerprint']?.toString() ?? p['fingerprint']?.toString();
+    String? fingerprint =
+        p['client-fingerprint']?.toString() ?? p['fingerprint']?.toString();
     String? publicKey;
     String? shortId;
     List<String>? alpn;
@@ -254,8 +282,10 @@ class NodeParser {
     final reality = p['reality-opts'] ?? p['reality'];
     if (reality is Map) {
       security = Security.reality;
-      publicKey = reality['public-key']?.toString() ?? reality['public_key']?.toString();
-      shortId = reality['short-id']?.toString() ?? reality['short_id']?.toString();
+      publicKey = reality['public-key']?.toString() ??
+          reality['public_key']?.toString();
+      shortId =
+          reality['short-id']?.toString() ?? reality['short_id']?.toString();
     } else if (tlsEnabled) {
       security = Security.tls;
     }
@@ -266,12 +296,17 @@ class NodeParser {
       alpn = (p['alpn'] as String).split(',');
     }
 
-    final wsOpts = p['ws-opts'] is Map ? Map<String, dynamic>.from(p['ws-opts'] as Map) : null;
-    final grpcOpts = p['grpc-opts'] is Map ? Map<String, dynamic>.from(p['grpc-opts'] as Map) : null;
+    final wsOpts = p['ws-opts'] is Map
+        ? Map<String, dynamic>.from(p['ws-opts'] as Map)
+        : null;
+    final grpcOpts = p['grpc-opts'] is Map
+        ? Map<String, dynamic>.from(p['grpc-opts'] as Map)
+        : null;
     final path = wsOpts?['path']?.toString() ?? p['path']?.toString();
     String? host;
     final headers = wsOpts?['headers'];
-    if (headers is Map) host = headers['Host']?.toString() ?? headers['host']?.toString();
+    if (headers is Map)
+      host = headers['Host']?.toString() ?? headers['host']?.toString();
     host ??= p['host']?.toString();
 
     Protocol protocol;
@@ -281,7 +316,8 @@ class NodeParser {
     int? alterId = int.tryParse('${p['alterId'] ?? p['aid'] ?? ''}');
     String? obfs = p['obfs']?.toString();
     String? obfsPassword = p['obfs-password']?.toString();
-    String? congestion = p['congestion-controller']?.toString() ?? p['congestion_control']?.toString();
+    String? congestion = p['congestion-controller']?.toString() ??
+        p['congestion_control']?.toString();
     String? privateKey;
     String? publicKeyWG;
     List<String>? allowedIPs;
@@ -317,10 +353,13 @@ class NodeParser {
       case 'wireguard':
       case 'wg':
         protocol = Protocol.wireguard;
-        privateKey = p['private-key']?.toString() ?? p['private_key']?.toString();
-        publicKeyWG = p['public-key']?.toString() ?? p['public_key']?.toString();
+        privateKey =
+            p['private-key']?.toString() ?? p['private_key']?.toString();
+        publicKeyWG =
+            p['public-key']?.toString() ?? p['public_key']?.toString();
         if (p['allowed-ips'] is List) {
-          allowedIPs = (p['allowed-ips'] as List).map((e) => e.toString()).toList();
+          allowedIPs =
+              (p['allowed-ips'] as List).map((e) => e.toString()).toList();
         }
         dns = p['dns']?.toString();
         break;
@@ -343,7 +382,8 @@ class NodeParser {
       transport: _mapTransport(network),
       path: path,
       host: host,
-      serviceName: grpcOpts?['grpc-service-name']?.toString() ?? p['service-name']?.toString(),
+      serviceName: grpcOpts?['grpc-service-name']?.toString() ??
+          p['service-name']?.toString(),
       security: security,
       sni: sni,
       alpn: alpn,
@@ -364,16 +404,24 @@ class NodeParser {
   ProxyNode _parseUri(String uri) {
     final scheme = uri.split('://').first.toLowerCase();
     switch (scheme) {
-      case 'vmess':     return _vmess(uri);
-      case 'vless':     return _vless(uri);
-      case 'trojan':    return _trojan(uri);
-      case 'ss':        return _ss(uri);
+      case 'vmess':
+        return _vmess(uri);
+      case 'vless':
+        return _vless(uri);
+      case 'trojan':
+        return _trojan(uri);
+      case 'ss':
+        return _ss(uri);
       case 'hysteria2':
-      case 'hy2':       return _hysteria2(uri);
-      case 'tuic':      return _tuic(uri);
+      case 'hy2':
+        return _hysteria2(uri);
+      case 'tuic':
+        return _tuic(uri);
       case 'wg':
-      case 'wireguard': return _wireguard(uri);
-      default: throw Exception('不支持的协议: $scheme');
+      case 'wireguard':
+        return _wireguard(uri);
+      default:
+        throw Exception('不支持的协议: $scheme');
     }
   }
 
@@ -406,8 +454,11 @@ class NodeParser {
   ProxyNode _vless(String uri) {
     final u = Uri.parse(uri.replaceFirst('vless://', 'https://'));
     final p = u.queryParameters;
-    final sec = p['security'] == 'reality' ? Security.reality
-      : p['security'] == 'tls' ? Security.tls : Security.none;
+    final sec = p['security'] == 'reality'
+        ? Security.reality
+        : p['security'] == 'tls'
+            ? Security.tls
+            : Security.none;
     return ProxyNode(
       id: _uuid(),
       name: Uri.decodeComponent(u.fragment.isNotEmpty ? u.fragment : u.host),
@@ -459,8 +510,11 @@ class NodeParser {
   ProxyNode _ss(String uri) {
     final withoutScheme = uri.substring('ss://'.length);
     final hashIdx = withoutScheme.indexOf('#');
-    final name = hashIdx >= 0 ? Uri.decodeComponent(withoutScheme.substring(hashIdx + 1)) : '';
-    final main = hashIdx >= 0 ? withoutScheme.substring(0, hashIdx) : withoutScheme;
+    final name = hashIdx >= 0
+        ? Uri.decodeComponent(withoutScheme.substring(hashIdx + 1))
+        : '';
+    final main =
+        hashIdx >= 0 ? withoutScheme.substring(0, hashIdx) : withoutScheme;
     String method, password, server;
     int port;
     if (main.contains('@')) {
@@ -511,7 +565,8 @@ class NodeParser {
   }
 
   ProxyNode _hysteria2(String uri) {
-    final u = Uri.parse(uri.replaceFirst(RegExp(r'^(hysteria2|hy2)://'), 'https://'));
+    final u =
+        Uri.parse(uri.replaceFirst(RegExp(r'^(hysteria2|hy2)://'), 'https://'));
     final p = u.queryParameters;
     return ProxyNode(
       id: _uuid(),
@@ -557,7 +612,8 @@ class NodeParser {
   }
 
   ProxyNode _wireguard(String uri) {
-    final u = Uri.parse(uri.replaceFirst(RegExp(r'^(wg|wireguard)://'), 'https://'));
+    final u =
+        Uri.parse(uri.replaceFirst(RegExp(r'^(wg|wireguard)://'), 'https://'));
     final p = u.queryParameters;
     return ProxyNode(
       id: _uuid(),
@@ -580,15 +636,18 @@ class NodeParser {
 
   ProxyNode _singboxOutboundToNode(Map<String, dynamic> ob) {
     final tls = (ob['tls'] as Map?)?.cast<String, dynamic>() ?? {};
-    final tp  = (ob['transport'] as Map?)?.cast<String, dynamic>() ?? {};
-    final isReality = tls['reality'] is Map && (tls['reality']['enabled'] == true || tls['reality']['public_key'] != null);
+    final tp = (ob['transport'] as Map?)?.cast<String, dynamic>() ?? {};
+    final isReality = tls['reality'] is Map &&
+        (tls['reality']['enabled'] == true ||
+            tls['reality']['public_key'] != null);
     final sec = tls['enabled'] == true
         ? (isReality ? Security.reality : Security.tls)
         : Security.none;
     final type = (ob['type'] as String? ?? 'vless').toLowerCase();
     final protocol = type == 'ss' || type == 'shadowsocks'
         ? Protocol.shadowsocks
-        : Protocol.values.firstWhere((p) => p.name == type, orElse: () => Protocol.vless);
+        : Protocol.values
+            .firstWhere((p) => p.name == type, orElse: () => Protocol.vless);
 
     return ProxyNode(
       id: _uuid(),
@@ -608,11 +667,16 @@ class NodeParser {
       security: sec,
       sni: tls['server_name']?.toString(),
       alpn: (tls['alpn'] as List?)?.map((e) => e.toString()).toList(),
-      fingerprint: tls['utls'] is Map ? tls['utls']['fingerprint']?.toString() : null,
-      publicKey: tls['reality'] is Map ? tls['reality']['public_key']?.toString() : null,
-      shortId: tls['reality'] is Map ? tls['reality']['short_id']?.toString() : null,
+      fingerprint:
+          tls['utls'] is Map ? tls['utls']['fingerprint']?.toString() : null,
+      publicKey: tls['reality'] is Map
+          ? tls['reality']['public_key']?.toString()
+          : null,
+      shortId:
+          tls['reality'] is Map ? tls['reality']['short_id']?.toString() : null,
       obfs: ob['obfs'] is Map ? ob['obfs']['type']?.toString() : null,
-      obfsPassword: ob['obfs'] is Map ? ob['obfs']['password']?.toString() : null,
+      obfsPassword:
+          ob['obfs'] is Map ? ob['obfs']['password']?.toString() : null,
       congestion: ob['congestion_control']?.toString(),
       source: NodeSource.sub233boySingbox,
     );
@@ -621,23 +685,32 @@ class NodeParser {
   Transport _mapTransport(String? t) {
     switch (t?.toLowerCase()) {
       case 'ws':
-      case 'websocket': return Transport.ws;
-      case 'grpc':      return Transport.grpc;
+      case 'websocket':
+        return Transport.ws;
+      case 'grpc':
+        return Transport.grpc;
       case 'http':
       case 'h2':
-      case 'httpupgrade': return Transport.http;
-      case 'quic':      return Transport.quic;
-      case 'none':      return Transport.none;
-      default:          return Transport.tcp;
+      case 'httpupgrade':
+        return Transport.http;
+      case 'quic':
+        return Transport.quic;
+      case 'none':
+        return Transport.none;
+      default:
+        return Transport.tcp;
     }
   }
 
   String? _detectSource(String url, String body) {
     final s = '${url.toLowerCase()} ${body.toLowerCase()}';
-    if (s.contains('233boy') && s.contains('sing-box')) return '233boy/sing-box';
-    if (s.contains('233boy') && s.contains('xray'))     return '233boy/Xray';
-    if (s.contains('v2ray-agent') || s.contains('mack-a')) return 'mack-a/v2ray-agent';
-    if (s.contains('sing-box-yg') || s.contains('yonggekkk')) return 'yonggekkk/sing-box-yg';
+    if (s.contains('233boy') && s.contains('sing-box'))
+      return '233boy/sing-box';
+    if (s.contains('233boy') && s.contains('xray')) return '233boy/Xray';
+    if (s.contains('v2ray-agent') || s.contains('mack-a'))
+      return 'mack-a/v2ray-agent';
+    if (s.contains('sing-box-yg') || s.contains('yonggekkk'))
+      return 'yonggekkk/sing-box-yg';
     if (_looksLikeClashYaml(body)) return 'Clash / Meta';
     return '通用格式';
   }
@@ -647,7 +720,9 @@ class NodeParser {
     return head.contains('proxies:') ||
         head.contains('proxy-groups:') ||
         head.contains('mixed-port:') ||
-        (head.contains('port:') && head.contains('type:') && head.contains('name:'));
+        (head.contains('port:') &&
+            head.contains('type:') &&
+            head.contains('name:'));
   }
 
   bool _looksLikeLocalPath(String s) {
@@ -698,24 +773,69 @@ class NodeParser {
   }
 
   static int _counter = 0;
-  String _uuid() => 'node-${DateTime.now().millisecondsSinceEpoch}-${_counter++}';
+  String _uuid() =>
+      'node-${DateTime.now().millisecondsSinceEpoch}-${_counter++}';
 
   static const _countryFlags = {
-    '日本': '🇯🇵', 'japan': '🇯🇵', 'jp': '🇯🇵', 'tokyo': '🇯🇵', 'osaka': '🇯🇵',
-    '美国': '🇺🇸', 'usa': '🇺🇸', 'us': '🇺🇸', 'angeles': '🇺🇸', 'york': '🇺🇸',
-    '香港': '🇭🇰', 'hk': '🇭🇰', 'hong kong': '🇭🇰',
-    '新加坡': '🇸🇬', 'sg': '🇸🇬', 'singapore': '🇸🇬',
-    '台湾': '🇹🇼', 'tw': '🇹🇼', 'taiwan': '🇹🇼',
-    '韩国': '🇰🇷', 'kr': '🇰🇷', 'korea': '🇰🇷', 'seoul': '🇰🇷',
-    '德国': '🇩🇪', 'de': '🇩🇪', 'germany': '🇩🇪', 'frankfurt': '🇩🇪',
-    '英国': '🇬🇧', 'uk': '🇬🇧', 'london': '🇬🇧',
-    '法国': '🇫🇷', 'fr': '🇫🇷', 'paris': '🇫🇷',
-    '澳大利亚': '🇦🇺', 'au': '🇦🇺', 'sydney': '🇦🇺',
+    '日本': '🇯🇵',
+    'japan': '🇯🇵',
+    'jp': '🇯🇵',
+    'tokyo': '🇯🇵',
+    'osaka': '🇯🇵',
+    '美国': '🇺🇸',
+    'usa': '🇺🇸',
+    'us': '🇺🇸',
+    'angeles': '🇺🇸',
+    'york': '🇺🇸',
+    '香港': '🇭🇰',
+    'hk': '🇭🇰',
+    'hong kong': '🇭🇰',
+    '新加坡': '🇸🇬',
+    'sg': '🇸🇬',
+    'singapore': '🇸🇬',
+    '台湾': '🇹🇼',
+    'tw': '🇹🇼',
+    'taiwan': '🇹🇼',
+    '韩国': '🇰🇷',
+    'kr': '🇰🇷',
+    'korea': '🇰🇷',
+    'seoul': '🇰🇷',
+    '德国': '🇩🇪',
+    'de': '🇩🇪',
+    'germany': '🇩🇪',
+    'frankfurt': '🇩🇪',
+    '英国': '🇬🇧',
+    'uk': '🇬🇧',
+    'london': '🇬🇧',
+    '法国': '🇫🇷',
+    'fr': '🇫🇷',
+    'paris': '🇫🇷',
+    '澳大利亚': '🇦🇺',
+    'au': '🇦🇺',
+    'sydney': '🇦🇺',
   };
   static const _regionGroups = {
-    '亚太': ['日本','香港','新加坡','台湾','韩国','澳大利亚','jp','hk','sg','tw','kr','au','tokyo','osaka','seoul','singapore','taiwan'],
-    '北美': ['美国','us','usa','angeles','york'],
-    '欧洲': ['德国','英国','法国','de','uk','fr','frankfurt','london','paris'],
+    '亚太': [
+      '日本',
+      '香港',
+      '新加坡',
+      '台湾',
+      '韩国',
+      '澳大利亚',
+      'jp',
+      'hk',
+      'sg',
+      'tw',
+      'kr',
+      'au',
+      'tokyo',
+      'osaka',
+      'seoul',
+      'singapore',
+      'taiwan'
+    ],
+    '北美': ['美国', 'us', 'usa', 'angeles', 'york'],
+    '欧洲': ['德国', '英国', '法国', 'de', 'uk', 'fr', 'frankfurt', 'london', 'paris'],
   };
 
   String _flagFromName(String name) {

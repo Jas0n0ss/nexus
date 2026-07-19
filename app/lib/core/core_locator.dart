@@ -28,8 +28,7 @@ class CoreLocator {
   /// Override for tests. Defaults to write bytes + chmod +x.
   final Future<void> Function(String path, List<int> bytes)? writeExecutable;
 
-  static String get exeName =>
-      Platform.isWindows ? 'sing-box.exe' : 'sing-box';
+  static String get exeName => Platform.isWindows ? 'sing-box.exe' : 'sing-box';
 
   static String get assetKey => 'assets/cores/$exeName';
 
@@ -53,7 +52,8 @@ class CoreLocator {
       join(exeDir, exeName),
       join(exeDir, 'cores$sep$exeName'),
       join(supportDir, 'cores$sep$exeName'),
-      join(exeDir, 'data${sep}flutter_assets${sep}assets${sep}cores$sep$exeName'),
+      join(exeDir,
+          'data${sep}flutter_assets${sep}assets${sep}cores$sep$exeName'),
     ];
 
     if (isMacOS) {
@@ -73,7 +73,6 @@ class CoreLocator {
     if (isLinux) {
       paths.addAll([
         '/usr/bin/sing-box',
-        '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
         '/usr/lib/nexus/data/flutter_assets/assets/cores/sing-box',
       ]);
     }
@@ -87,10 +86,8 @@ class CoreLocator {
       paths.addAll([
         join(supportDir, 'sing-box'),
         join(supportDir, 'cores/sing-box'),
-        '/data/data/com.nexusvpn.nexus_vpn/files/sing-box',
-        '/data/data/com.nexusvpn.nexus_vpn/files/cores/sing-box',
-        '/data/data/com.nexusvpn.nexusVpn/files/sing-box',
-        '/data/data/com.nexus.app/files/sing-box',
+        '/data/data/com.nexusvpn.nexus/files/sing-box',
+        '/data/data/com.nexusvpn.nexus/files/cores/sing-box',
       ]);
     }
 
@@ -164,7 +161,8 @@ class CoreLocator {
   Future<String?> extractAssetTo(String destPath) async {
     final data = await _loadAsset(assetKey);
     if (data == null) return null;
-    final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+    final bytes =
+        data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
     if (bytes.isEmpty) return null;
 
     // Skip rewrite if same size already present (cheap cache).

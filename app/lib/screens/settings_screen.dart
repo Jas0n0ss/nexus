@@ -14,7 +14,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
@@ -86,7 +86,10 @@ class _CoreBlock extends StatelessWidget {
     return _Section(
       title: '核心',
       children: [
-        _SwitchRow('TUN 模式', '系统级透明代理', s.tunMode,
+        _SwitchRow(
+            'TUN 模式',
+            '系统级代理（桌面需管理员；失败时自动改用系统代理）',
+            s.tunMode,
             (v) => _set(context, (x) => x.tunMode = v, reload: true)),
         _SwitchRow('系统代理', '关闭 TUN 时设置 HTTP 代理', s.systemProxy,
             (v) => _set(context, (x) => x.systemProxy = v, reload: true)),
