@@ -11,6 +11,7 @@
 #include <ws2tcpip.h>
 #include <shlwapi.h>
 #include <string>
+#include <vector>
 #include <memory>
 #include <thread>
 
@@ -20,7 +21,7 @@ typedef void (WINAPI *CloseAdapter_t)(WINTUN_ADAPTER_HANDLE);
 typedef WINTUN_SESSION_HANDLE (WINAPI *StartSession_t)(WINTUN_ADAPTER_HANDLE, DWORD);
 typedef void (WINAPI *EndSession_t)(WINTUN_SESSION_HANDLE);
 
-namespace nexus_vpn {
+namespace nexus {
 
 static HANDLE g_singboxProcess = NULL;
 static HMODULE g_wintun = NULL;
@@ -28,7 +29,7 @@ static WINTUN_ADAPTER_HANDLE g_adapter = NULL;
 
 void VpnChannel::RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar) {
     auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-        registrar->messenger(), "com.nexusvpn/vpn",
+        registrar->messenger(), "com.nexus/proxy",
         &flutter::StandardMethodCodec::GetInstance());
 
     auto plugin = std::make_unique<VpnChannel>();
@@ -46,14 +47,14 @@ void VpnChannel::HandleMethodCall(
 {
     const auto& method = call.method_name();
 
-    if (method == "startVpn") {
+    if (method == "startVpn" || method == "startTunnel") {
         auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
         if (!args) { result->Error("INVALID_ARGS", "Expected map"); return; }
 
         const auto& configJson = std::get<std::string>(args->at(flutter::EncodableValue("config")));
         StartVpn(configJson, std::move(result));
     }
-    else if (method == "stopVpn") {
+    else if (method == "stopVpn" || method == "stopTunnel") {
         StopVpn(std::move(result));
     }
     else if (method == "getStats") {
@@ -110,13 +111,37 @@ void VpnChannel::StartVpn(
         return;
     }
 
-    // 3. Start sing-box process with the config
-    std::string cmd = "sing-box.exe run -c " + configFile;
+    // 3. Resolve sing-box.exe next to this process (or cores\ subfolder)
+    char modulePath[MAX_PATH];
+    GetModuleFileNameA(NULL, modulePath, MAX_PATH);
+    PathRemoveFileSpecA(modulePath);
+    std::string exeDir(modulePath);
+    std::string candidates[] = {
+        exeDir + "\\sing-box.exe",
+        exeDir + "\\cores\\sing-box.exe",
+    };
+    std::string singboxPath;
+    for (const auto& c : candidates) {
+        if (GetFileAttributesA(c.c_str()) != INVALID_FILE_ATTRIBUTES) {
+            singboxPath = c;
+            break;
+        }
+    }
+    if (singboxPath.empty()) {
+        result->Error("PROCESS_ERROR",
+            "sing-box.exe not found next to app or in cores\\");
+        return;
+    }
+
+    std::string cmd = "\"" + singboxPath + "\" run -c \"" + configFile + "\"";
     STARTUPINFOA si = {sizeof(si)};
     PROCESS_INFORMATION pi;
+    // CreateProcess may mutate the command line buffer.
+    std::vector<char> cmdBuf(cmd.begin(), cmd.end());
+    cmdBuf.push_back('\0');
 
-    if (!CreateProcessA(NULL, (LPSTR)cmd.c_str(), NULL, NULL, FALSE,
-        CREATE_NO_WINDOW, NULL, NULL, &si, &pi)) {
+    if (!CreateProcessA(NULL, cmdBuf.data(), NULL, NULL, FALSE,
+        CREATE_NO_WINDOW, NULL, exeDir.c_str(), &si, &pi)) {
         result->Error("PROCESS_ERROR", "Failed to start sing-box.exe");
         return;
     }
@@ -179,4 +204,4 @@ void VpnChannel::ClearSystemProxy() {
     InternetSetOptionA(NULL, INTERNET_OPTION_REFRESH, NULL, 0);
 }
 
-} // namespace nexus_vpn
+} // namespace nexus

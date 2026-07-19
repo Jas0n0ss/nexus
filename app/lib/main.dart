@@ -8,7 +8,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'app.dart';
-import 'providers/vpn_provider.dart';
+import 'providers/session_provider.dart';
 import 'providers/nodes_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/logs_provider.dart';
@@ -27,7 +27,7 @@ void main() async {
     await windowManager.ensureInitialized();
     await windowManager.setMinimumSize(const Size(900, 600));
     await windowManager.setSize(const Size(1100, 720));
-    await windowManager.setTitle('Nexus VPN');
+    await windowManager.setTitle('Nexus');
     await windowManager.center();
   }
 
@@ -50,15 +50,15 @@ void main() async {
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => LogsProvider()),
         ChangeNotifierProvider(create: (_) => NodesProvider()),
-        ChangeNotifierProxyProvider2<NodesProvider, SettingsProvider, VpnProvider>(
-          create: (ctx) => VpnProvider(
+        ChangeNotifierProxyProvider2<NodesProvider, SettingsProvider, SessionProvider>(
+          create: (ctx) => SessionProvider(
             singboxRunner: SingboxRunner(),
             logsProvider: ctx.read<LogsProvider>(),
           )..bindSettings(ctx.read<SettingsProvider>()),
-          update: (ctx, nodes, settings, vpn) {
-            vpn!.bindSettings(settings);
-            vpn.updateNodes(nodes);
-            return vpn;
+          update: (ctx, nodes, settings, session) {
+            session!.bindSettings(settings);
+            session.updateNodes(nodes);
+            return session;
           },
         ),
       ],

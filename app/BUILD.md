@@ -1,4 +1,4 @@
-# Nexus VPN — Build Guide
+# Nexus — Build Guide
 
 ## Prerequisites
 
@@ -21,10 +21,29 @@ flutter pub get
 
 ## 2. Download sing-box Binaries
 
+**Required for connect.** Without a core binary the app shows  
+`未找到 sing-box 核心`. At runtime the client also extracts  
+`assets/cores/sing-box` into Application Support when present.
+
 ```bash
+# From repo root — preferred one-liner (current host platform):
+bash app/scripts/fetch_singbox.sh
+
+# Or pick a platform:
+bash app/scripts/fetch_singbox.sh --platform macos
+bash app/scripts/fetch_singbox.sh --platform linux
+bash app/scripts/fetch_singbox.sh --platform windows
+bash app/scripts/fetch_singbox.sh --platform android
+```
+
+Manual download (equivalent):
+
+```bash
+cd app
 # macOS (arm64 + x64 universal)
 mkdir -p assets/cores
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-darwin-amd64.tar.gz | tar xz
+curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-darwin-arm64.tar.gz | tar xz
 lipo -create -output assets/cores/sing-box \
   sing-box-1.9.3-darwin-amd64/sing-box \
   sing-box-1.9.3-darwin-arm64/sing-box
@@ -33,17 +52,17 @@ lipo -create -output assets/cores/sing-box \
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-ios.tar.gz | tar xz
 cp sing-box-1.9.3-ios/sing-box ios/NexusVPNExtension/sing-box
 
-# Android (arm64-v8a + x86_64)
-for ABI in arm64-v8a x86_64 armeabi-v7a; do
-  curl -L "https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-android-${ABI}.tar.gz" | tar xz
-  mkdir -p android/app/src/main/assets/cores
-  cp "sing-box-1.9.3-android-${ABI}/sing-box" "android/app/src/main/assets/cores/sing-box-${ABI}"
-done
+# Android — note release arch names differ from ABI folders
+mkdir -p android/app/src/main/assets/cores
+curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-android-arm64.tar.gz | tar xz
+cp sing-box-1.9.3-android-arm64/sing-box android/app/src/main/assets/cores/sing-box-arm64-v8a
+# … similarly armv7 → armeabi-v7a, amd64 → x86_64
 
 # Windows
 curl -L https://github.com/SagerNet/sing-box/releases/download/v1.9.3/sing-box-1.9.3-windows-amd64.zip -o sb-win.zip
 unzip sb-win.zip
 cp sing-box-1.9.3-windows-amd64/sing-box.exe windows/runner/
+cp windows/runner/sing-box.exe assets/cores/sing-box.exe
 # Also download WinTUN: https://www.wintun.net/
 curl -L https://www.wintun.net/builds/wintun-0.14.1.zip -o wintun.zip
 unzip wintun.zip
@@ -66,14 +85,14 @@ flutter build macos --release
 # Package as DMG
 brew install create-dmg
 create-dmg \
-  --volname "Nexus VPN" \
+  --volname "Nexus" \
   --background "macos/dmg-background.png" \
   --window-size 540 380 \
   --icon-size 128 \
-  --icon "Nexus VPN.app" 160 190 \
+  --icon "Nexus.app" 160 190 \
   --app-drop-link 380 190 \
-  "Nexus VPN.dmg" \
-  "build/macos/Build/Products/Release/Nexus VPN.app"
+  "Nexus.dmg" \
+  "build/macos/Build/Products/Release/Nexus.app"
 ```
 
 **Required Entitlements (macos/Runner/*.entitlements):**
@@ -156,10 +175,10 @@ cask "nexus-vpn" do
   version "1.0.0"
   sha256 "..."
   url "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-1.0.0.dmg"
-  name "Nexus VPN"
-  desc "Cross-platform VPN client supporting VLESS/Hysteria2/TUIC"
+  name "Nexus"
+  desc "Cross-platform proxy client supporting VLESS/Hysteria2/TUIC"
   homepage "https://github.com/yourorg/nexus-vpn"
-  app "Nexus VPN.app"
+  app "Nexus.app"
 end
 ```
 
@@ -168,7 +187,7 @@ end
 # manifests/y/yourorg/nexusvpn/1.0.0/yourorg.nexusvpn.yaml
 PackageIdentifier: yourorg.nexusvpn
 PackageVersion: 1.0.0
-PackageName: Nexus VPN
+PackageName: Nexus
 Installers:
   - Architecture: x64
     InstallerType: inno
@@ -179,7 +198,7 @@ Installers:
 ```json
 {
   "version": "1.0.0",
-  "description": "Nexus VPN — cross-platform VPN client",
+  "description": "Nexus — cross-platform proxy client",
   "url": "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-portable.zip",
   "bin": "nexus_vpn.exe"
 }

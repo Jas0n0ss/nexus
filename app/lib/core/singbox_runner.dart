@@ -9,7 +9,8 @@ import 'package:path_provider/path_provider.dart';
 import '../models/proxy_node.dart';
 import '../providers/settings_provider.dart';
 import 'config_generator.dart';
-import 'platform_vpn.dart';
+import 'core_locator.dart';
+import 'platform_proxy.dart';
 
 class CoreStats {
   final double uploadMbps;
@@ -60,26 +61,27 @@ class SingboxRunner {
     _configPath = configFile.path;
     _logStream?.add('[INFO] 配置已写入 ${_configPath}');
 
-    // Prefer native VPN channel (Windows WinTUN / Android VpnService)
-    if (PlatformVpn.supportsNativeChannel) {
+    // Prefer native tunnel channel (Windows WinTUN / Android VpnService)
+    if (PlatformProxy.supportsNativeChannel) {
       try {
-        final ok = await PlatformVpn.startVpn(configJson);
+        final ok = await PlatformProxy.startTunnel(configJson);
         if (ok) {
           _usingNative = true;
-          _logStream?.add('[OK] 已通过平台 VPN 通道启动');
+          _logStream?.add('[OK] 已通过平台隧道通道启动');
           _watchNative();
           return;
         }
         _logStream?.add('[INFO] 平台通道未接管，回退到本地 sing-box 进程');
       } catch (e) {
-        _logStream?.add('[WARN] 平台 VPN: $e — 尝试本地进程');
+        _logStream?.add('[WARN] 平台隧道: $e — 尝试本地进程');
       }
     }
 
-    final binary = await _findBinary();
+    final binary = await CoreLocator().resolve();
     if (binary == null) {
-      final msg = '未找到 sing-box 核心。请确认安装包内含 cores/sing-box，'
-          '或将 sing-box 放到应用目录。配置已生成: ${_configPath}';
+      final msg = '未找到 sing-box 核心。请运行 app/scripts/fetch_singbox.sh '
+          '下载内核，或确认安装包内含 cores/sing-box。'
+          '配置已生成: ${_configPath}';
       _logStream?.add('[ERR] $msg');
       // Only allow fake simulator in explicit debug + flag
       if (kDebugMode &&
@@ -141,7 +143,7 @@ class SingboxRunner {
     final wantSysProxy = settings?.systemProxy ?? true;
     if (!wantTun && wantSysProxy &&
         (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
-      final ok = await PlatformVpn.setSystemProxy(
+      final ok = await PlatformProxy.setSystemProxy(
         host: '127.0.0.1',
         port: _mixedPort,
       );
@@ -173,12 +175,12 @@ class SingboxRunner {
     _exitWatcher = null;
 
     if (_usingNative) {
-      await PlatformVpn.stopVpn();
+      await PlatformProxy.stopTunnel();
       _usingNative = false;
     }
 
     if (_usingSystemProxy) {
-      await PlatformVpn.clearSystemProxy();
+      await PlatformProxy.clearSystemProxy();
       if (Platform.isWindows) {
         try {
           await Process.run('netsh', ['winhttp', 'reset', 'proxy']);
@@ -261,38 +263,5 @@ class SingboxRunner {
 
   void _watchNative() {
     // Native path has no Process handle; stats still come from Clash API.
-  }
-
-  Future<String?> _findBinary() async {
-    final exeName = Platform.isWindows ? 'sing-box.exe' : 'sing-box';
-    final support = (await getApplicationSupportDirectory()).path;
-    final exeDir = File(Platform.resolvedExecutable).parent.path;
-
-    final candidates = <String>[
-      '$exeDir/$exeName',
-      '$exeDir/cores/$exeName',
-      '$support/cores/$exeName',
-      '$exeDir/data/flutter_assets/assets/cores/$exeName',
-      if (Platform.isMacOS) ...[
-        '/usr/local/bin/sing-box',
-        '/opt/homebrew/bin/sing-box',
-      ],
-      if (Platform.isLinux) ...[
-        '/usr/bin/sing-box',
-        '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
-      ],
-      if (Platform.isWindows) r'C:\Program Files\sing-box\sing-box.exe',
-      // Android extracted asset
-      if (Platform.isAndroid) ...[
-        '$support/cores/sing-box',
-        '/data/data/com.nexusvpn.nexus_vpn/files/cores/sing-box',
-      ],
-    ];
-
-    for (final path in candidates) {
-      final f = File(path);
-      if (await f.exists()) return f.path;
-    }
-    return null;
   }
 }

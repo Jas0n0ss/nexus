@@ -12,7 +12,7 @@ class NexusApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
     return MaterialApp(
-      title: 'Nexus VPN',
+      title: 'Nexus',
       debugShowCheckedModeBanner: false,
       themeMode: settings.themeMode,
       theme: NexusTheme.light(),

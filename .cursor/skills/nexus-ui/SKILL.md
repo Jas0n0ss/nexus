@@ -1,12 +1,12 @@
 ---
 name: nexus-ui
-description: Rebuild and style the Nexus VPN Flutter client UI. Use when changing screens, theme, shell layout, connect button, or visual design.
+description: Rebuild and style the Nexus Flutter client UI. Use when changing screens, theme, shell layout, connect button, or visual design.
 ---
 
-# Nexus VPN UI Skill
+# Nexus UI Skill
 
 ## Product
-Nexus VPN — cross-platform proxy client (sing-box). Desktop sidebar + mobile tabs.
+Nexus — cross-platform proxy client (sing-box). Desktop sidebar + mobile tabs.
 Screens: Dashboard · Nodes · Import · Logs · Settings.
 
 ## Visual direction (locked)

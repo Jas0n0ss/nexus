@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Compute the next Nexus VPN release version.
+# Compute the next Nexus release version.
 #
 # Scheme (patch always 0):
 #   0.10.0 → 0.11.0 → … → 0.19.0 → 1.1.0 → 1.2.0 → … → 1.9.0 → 2.1.0 → …

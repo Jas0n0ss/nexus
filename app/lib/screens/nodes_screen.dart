@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../providers/nodes_provider.dart';
-import '../providers/vpn_provider.dart';
+import '../providers/session_provider.dart';
 import '../providers/shell_nav.dart';
 import '../models/proxy_node.dart';
 import '../theme/nexus_theme.dart';
@@ -155,9 +155,9 @@ class _NodeRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nodes = context.watch<NodesProvider>();
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
     final selected = nodes.selected?.id == node.id;
-    final active = vpn.activeNode?.id == node.id && vpn.isConnected;
+    final active = proxy.activeNode?.id == node.id && proxy.isConnected;
 
     return NexusSurface(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -168,7 +168,7 @@ class _NodeRow extends StatelessWidget {
               : null,
       onTap: () async {
         nodes.select(node);
-        if (vpn.isConnected) await vpn.connect(node);
+        if (proxy.isConnected) await proxy.connect(node);
       },
       child: Row(
         children: [

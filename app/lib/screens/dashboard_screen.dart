@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../providers/vpn_provider.dart';
+import '../providers/session_provider.dart';
 import '../providers/nodes_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/shell_nav.dart';
@@ -64,11 +64,11 @@ class _HeroConnect extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
     final nodes = context.watch<NodesProvider>();
     final settings = context.watch<SettingsProvider>();
     final node = nodes.selected;
-    final connected = vpn.isConnected;
+    final connected = proxy.isConnected;
 
     return NexusSurface(
       padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
@@ -97,7 +97,7 @@ class _HeroConnect extends StatelessWidget {
                       height: 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: vpn.state == VpnState.error
+                        color: proxy.state == SessionState.error
                             ? NexusColors.danger
                             : connected
                                 ? NexusColors.ok
@@ -106,11 +106,11 @@ class _HeroConnect extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      vpn.state == VpnState.connecting
+                      proxy.state == SessionState.connecting
                           ? '连接中'
-                          : vpn.state == VpnState.disconnecting
+                          : proxy.state == SessionState.disconnecting
                               ? '断开中'
-                              : vpn.state == VpnState.error
+                              : proxy.state == SessionState.error
                                   ? '失败'
                                   : connected
                                       ? '已连接'
@@ -122,7 +122,7 @@ class _HeroConnect extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   connected
-                      ? (vpn.externalIp ?? '获取出口…')
+                      ? (proxy.externalIp ?? '获取出口…')
                       : (nodes.isEmpty ? '先导入节点' : '准备就绪'),
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(fontSize: 34),
                 ),
@@ -138,10 +138,10 @@ class _HeroConnect extends StatelessWidget {
                   'TUN ${settings.tunMode ? "开" : "关"}  ·  ${settings.routeMode.name}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
-                if (vpn.state == VpnState.error && vpn.lastError != null) ...[
+                if (proxy.state == SessionState.error && proxy.lastError != null) ...[
                   const SizedBox(height: 10),
                   Text(
-                    vpn.lastError!,
+                    proxy.lastError!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: NexusColors.danger, fontSize: 12),
@@ -152,8 +152,8 @@ class _HeroConnect extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           ConnectButton(
-            state: vpn.state,
-            onToggle: () => vpn.toggle(nodes.selected),
+            state: proxy.state,
+            onToggle: () => proxy.toggle(nodes.selected),
           ),
         ],
       ),
@@ -167,7 +167,7 @@ class _RouteModes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final settings = context.watch<SettingsProvider>();
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
     final modes = [
       (RouteMode.rule, '规则', '国内直连'),
       (RouteMode.global, '全局', '全部代理'),
@@ -193,7 +193,7 @@ class _RouteModes extends StatelessWidget {
                     onTap: () async {
                       if (settings.routeMode == m.$1) return;
                       settings.set((s) => s.routeMode = m.$1);
-                      if (vpn.isConnected) await vpn.applySettingsAndReconnect();
+                      if (proxy.isConnected) await proxy.applySettingsAndReconnect();
                     },
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,12 +226,12 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
     final items = [
-      ('上传', '${vpn.uploadMbps.toStringAsFixed(1)}', 'Mbps'),
-      ('下载', '${vpn.downloadMbps.toStringAsFixed(1)}', 'Mbps'),
-      ('延迟', '${vpn.latencyMs}', 'ms'),
-      ('今日', vpn.totalGbToday.toStringAsFixed(2), 'GB'),
+      ('上传', '${proxy.uploadMbps.toStringAsFixed(1)}', 'Mbps'),
+      ('下载', '${proxy.downloadMbps.toStringAsFixed(1)}', 'Mbps'),
+      ('延迟', '${proxy.latencyMs}', 'ms'),
+      ('今日', proxy.totalGbToday.toStringAsFixed(2), 'GB'),
     ];
     return Row(
       children: [
@@ -268,7 +268,7 @@ class _SpeedChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
     List<FlSpot> spots(List<double> data) =>
         data.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value)).toList();
 
@@ -307,8 +307,8 @@ class _SpeedChart extends StatelessWidget {
                   rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
                 ),
                 lineBarsData: [
-                  _line(spots(vpn.uploadHistory), NexusColors.ok),
-                  _line(spots(vpn.downloadHistory), NexusColors.accent),
+                  _line(spots(proxy.uploadHistory), NexusColors.ok),
+                  _line(spots(proxy.downloadHistory), NexusColors.accent),
                 ],
               ),
               duration: const Duration(milliseconds: 150),
@@ -348,7 +348,7 @@ class _QuickNodes extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nodes = context.watch<NodesProvider>();
-    final vpn = context.watch<VpnProvider>();
+    final proxy = context.watch<SessionProvider>();
 
     if (nodes.isEmpty) {
       return NexusSurface(
@@ -406,7 +406,7 @@ class _QuickNodes extends StatelessWidget {
                     active ? NexusColors.accent.withOpacity(0.5) : null,
                 onTap: () async {
                   nodes.select(n);
-                  if (vpn.isConnected) await vpn.connect(n);
+                  if (proxy.isConnected) await proxy.connect(n);
                 },
                 child: SizedBox(
                   width: 108,

@@ -2,10 +2,10 @@
 // Run with: flutter test
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:nexus_vpn/models/proxy_node.dart';
+import 'package:nexus/models/proxy_node.dart';
 
 void main() {
-  group('Nexus VPN smoke tests', () {
+  group('Nexus smoke tests', () {
     test('trivial true', () {
       expect(1 + 1, 2);
     });

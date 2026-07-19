@@ -1,20 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../providers/vpn_provider.dart';
+import '../providers/session_provider.dart';
 import '../theme/nexus_theme.dart';
 
 class ConnectButton extends StatelessWidget {
-  final VpnState state;
+  final SessionState state;
   final VoidCallback onToggle;
   const ConnectButton({super.key, required this.state, required this.onToggle});
 
   @override
   Widget build(BuildContext context) {
-    final isOn = state == VpnState.connected;
+    final isOn = state == SessionState.connected;
     final isLoading =
-        state == VpnState.connecting || state == VpnState.disconnecting;
+        state == SessionState.connecting || state == SessionState.disconnecting;
     final label = isLoading
-        ? (state == VpnState.connecting ? '…' : '…')
+        ? (state == SessionState.connecting ? '…' : '…')
         : (isOn ? '断开' : '连接');
 
     return GestureDetector(

@@ -1,14 +1,17 @@
 # ╔══════════════════════════════════════════════════════════════════════════════╗
-# ║  Nexus VPN — CI / Build / Release                                          ║
+# ║  Nexus — CI / Build / Release                                          ║
 # ║                                                                            ║
 # ║  Triggers:                                                                 ║
-# ║    push → main     : builds + auto tag/release (no manual tag input)       ║
-# ║    push → develop  : lint + test + platform builds                         ║
-# ║    PR   → main/dev : lint + test + platform builds                         ║
+# ║    push → main     : builds + auto bump tag + GitHub Release               ║
+# ║    push → develop  : lint + test + platform builds (no Release)            ║
+# ║    PR   → main/dev : lint + test + platform builds (no Release)            ║
 # ║    tag  → v*.*.*   : rebuild + release (skipped if Release already exists) ║
 # ║                                                                            ║
 # ║  Auto version on main (patch always .0):                                   ║
 # ║    0.10 → 0.11 → … → 0.19 → 1.1 → … → 1.9 → 2.1 → …                     ║
+# ║                                                                            ║
+# ║  Retention: after each new Release, keep the newest 2; delete older ones   ║
+# ║  (and their tags). PR builds never publish — merge to main to ship.        ║
 # ║                                                                            ║
 # ║  Jobs: version → lint/test + builds → all-builds → release(+auto-tag)      ║
 # ╚══════════════════════════════════════════════════════════════════════════════╝
@@ -312,8 +315,8 @@ jobs:
           # Universal APK (recommended download for phones)
           if [ -f app/build/app/outputs/flutter-apk/app-release.apk ]; then
             cp app/build/app/outputs/flutter-apk/app-release.apk \
-               "dist/NexusVPN-${VERSION}-android-universal.apk"
-            echo "✅ dist/NexusVPN-${VERSION}-android-universal.apk"
+               "dist/Nexus-${VERSION}-android-universal.apk"
+            echo "✅ dist/Nexus-${VERSION}-android-universal.apk"
           fi
 
           # Per-ABI APKs
@@ -324,14 +327,14 @@ jobs:
             [ "$name" = "app-release.apk" ] && continue
             abi="${name#app-}"
             abi="${abi%-release.apk}"
-            cp "$f" "dist/NexusVPN-${VERSION}-android-${abi}.apk"
-            echo "✅ dist/NexusVPN-${VERSION}-android-${abi}.apk"
+            cp "$f" "dist/Nexus-${VERSION}-android-${abi}.apk"
+            echo "✅ dist/Nexus-${VERSION}-android-${abi}.apk"
           done
 
           # AAB is for Play Console only — name it so users don't try to install it
           cp app/build/app/outputs/bundle/release/app-release.aab \
-             "dist/NexusVPN-${VERSION}-android-play.aab"
-          echo "✅ dist/NexusVPN-${VERSION}-android-play.aab"
+             "dist/Nexus-${VERSION}-android-play.aab"
+          echo "✅ dist/Nexus-${VERSION}-android-play.aab"
           ls -lh dist/
 
       - name: Validate Android packages (installable)
@@ -383,7 +386,7 @@ jobs:
                       f"❌ {apk.name} is signed with Android Debug cert — "
                       "many phones will refuse to install it"
                   )
-              if "CN=Nexus VPN" not in subject and "APK Signature Block" not in subject:
+              if "CN=Nexus" not in subject and "APK Signature Block" not in subject:
                   print("⚠️  cert subject unexpected; continuing if not debug-signed")
               print(f"✅ {apk.name} release-signed & structurally valid")
 
@@ -521,7 +524,7 @@ jobs:
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \
-            'Name=Nexus VPN' \
+            'Name=Nexus' \
             'Exec=nexus_vpn' \
             'Icon=nexus-vpn' \
             'Categories=Network;' \
@@ -542,7 +545,7 @@ jobs:
 
           # Build AppImage — APPIMAGE_EXTRACT_AND_RUN avoids FUSE requirement on CI
           APPIMAGE_EXTRACT_AND_RUN=1 \
-            appimagetool AppDir "dist/NexusVPN-${VERSION}-linux-x86_64.AppImage"
+            appimagetool AppDir "dist/Nexus-${VERSION}-linux-x86_64.AppImage"
           echo "✅ $(ls -lh dist/*.AppImage)"
 
       # ── .deb ────────────────────────────────────────────────────────────────
@@ -582,7 +585,7 @@ jobs:
           printf '%s\n' \
             '[Desktop Entry]' \
             'Type=Application' \
-            'Name=Nexus VPN' \
+            'Name=Nexus' \
             'Exec=nexus-vpn' \
             'Icon=nexus-vpn' \
             'Categories=Network;' \
@@ -597,14 +600,14 @@ jobs:
             echo "Priority: optional"
             echo "Architecture: amd64"
             echo "Depends: libgtk-3-0 (>= 3.22), libglib2.0-0, liblzma5"
-            echo "Maintainer: Nexus VPN <support@nexusvpn.app>"
+            echo "Maintainer: Nexus <support@nexusvpn.app>"
             echo "Description: Cross-platform VPN client"
             echo " Supports VLESS+REALITY, VMess, Trojan, Shadowsocks,"
             echo " Hysteria2, TUIC v5, and WireGuard."
           } > "${DEB}/DEBIAN/control"
 
           chmod 755 "${DEB}/DEBIAN"
-          fakeroot dpkg-deb --build "${DEB}" "dist/NexusVPN-${VERSION}-linux-amd64.deb"
+          fakeroot dpkg-deb --build "${DEB}" "dist/Nexus-${VERSION}-linux-amd64.deb"
           echo "✅ $(ls -lh dist/*.deb)"
 
       # ── .rpm ────────────────────────────────────────────────────────────────
@@ -633,7 +636,7 @@ jobs:
           %global __os_install_post %{nil}
 
           %description
-          Nexus VPN is a modern cross-platform VPN client powered by sing-box.
+          Nexus is a modern cross-platform VPN client powered by sing-box.
           Supports VLESS+REALITY, VMess, Trojan, Shadowsocks, Hysteria2,
           TUIC v5 and WireGuard, with one-click import from popular
           server-side deployment scripts.
@@ -653,16 +656,16 @@ jobs:
           # Arch subdirectory name can vary — locate the built rpm robustly
           RPM_FILE=$(find "${TOP}/RPMS" -name '*.rpm' | head -1)
           [ -n "$RPM_FILE" ] || { echo "❌ rpmbuild produced no .rpm"; exit 1; }
-          cp "$RPM_FILE" "dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
+          cp "$RPM_FILE" "dist/Nexus-${VERSION}-linux-x86_64.rpm"
           echo "✅ $(ls -lh dist/*.rpm)"
 
       - name: Validate Linux packages
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
-          AI="dist/NexusVPN-${VERSION}-linux-x86_64.AppImage"
-          DEB="dist/NexusVPN-${VERSION}-linux-amd64.deb"
-          RPM="dist/NexusVPN-${VERSION}-linux-x86_64.rpm"
+          AI="dist/Nexus-${VERSION}-linux-x86_64.AppImage"
+          DEB="dist/Nexus-${VERSION}-linux-amd64.deb"
+          RPM="dist/Nexus-${VERSION}-linux-x86_64.rpm"
 
           # AppImage: ELF + extractable + contains binary
           file "$AI" | grep -q 'ELF'
@@ -821,11 +824,42 @@ jobs:
           foreach ($f in $targets) {
             & $signtool sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
               /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
-              /d "Nexus VPN" $f.FullName
+              /d "Nexus" $f.FullName
             if ($LASTEXITCODE -ne 0) { throw "signtool failed for $($f.Name)" }
             Write-Host "✅ signed $($f.Name)"
           }
           Remove-Item $pfx -Force
+
+      # Fallback integrity signature. The certificate is local/self-signed, so
+      # Windows still shows Unknown publisher until a public CA cert is set.
+      - name: Sign Windows binaries (generated local certificate)
+        if: ${{ env.HAS_WINDOWS_CERT != 'true' }}
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=Nexus Local Build, O=Nexus" `
+            -CertStoreLocation "Cert:\CurrentUser\My" `
+            -HashAlgorithm SHA256 `
+            -NotAfter (Get-Date).AddDays(30)
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          if (-not $signtool) { throw "signtool.exe not found" }
+          $src = "app/build/windows/x64/runner/Release"
+          Copy-Item "app/windows/runner/sing-box.exe" "$src/" -Force -ErrorAction SilentlyContinue
+          Copy-Item "app/windows/runner/wintun.dll"   "$src/" -Force -ErrorAction SilentlyContinue
+          $targets = Get-ChildItem $src -Include *.exe,*.dll -Recurse |
+            Where-Object { $_.Name -notmatch '^(icudtl)' }
+          foreach ($f in $targets) {
+            & $signtool sign /sha1 $cert.Thumbprint /s My /fd SHA256 `
+              /d "Nexus Local Build" $f.FullName
+            if ($LASTEXITCODE -ne 0) { throw "local signtool failed for $($f.Name)" }
+            Write-Host "✅ locally signed $($f.Name)"
+          }
+          "WINDOWS_LOCAL_CERT_THUMBPRINT=$($cert.Thumbprint)" | Out-File `
+            -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          Write-Warning "Self-signed certificate adds integrity only; SmartScreen still reports Unknown publisher."
 
       - name: Install Inno Setup 6 (if not preinstalled)
         shell: pwsh
@@ -862,7 +896,7 @@ jobs:
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
           $ver = "${{ needs.version.outputs.version }}"
-          $setup = "dist/NexusVPN-$ver-windows-setup.exe"
+          $setup = "dist/Nexus-$ver-windows-setup.exe"
           $pfx = Join-Path $env:RUNNER_TEMP "nexus-windows-setup.pfx"
           [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_BASE64))
           $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
@@ -870,10 +904,24 @@ jobs:
             Select-Object -First 1 -ExpandProperty FullName
           & $signtool sign /f $pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD `
             /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 `
-            /d "Nexus VPN Setup" $setup
+            /d "Nexus Setup" $setup
           if ($LASTEXITCODE -ne 0) { throw "signtool failed for setup.exe" }
           Remove-Item $pfx -Force
           Write-Host "✅ signed $setup"
+
+      - name: Sign Windows installer (generated local certificate)
+        if: ${{ env.HAS_WINDOWS_CERT != 'true' }}
+        shell: pwsh
+        run: |
+          $ver = "${{ needs.version.outputs.version }}"
+          $setup = "dist/Nexus-$ver-windows-setup.exe"
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Select-Object -First 1 -ExpandProperty FullName
+          & $signtool sign /sha1 $env:WINDOWS_LOCAL_CERT_THUMBPRINT /s My `
+            /fd SHA256 /d "Nexus Local Setup" $setup
+          if ($LASTEXITCODE -ne 0) { throw "local signtool failed for setup.exe" }
+          Write-Host "✅ locally signed $setup"
 
       - name: Package portable ZIP
         shell: pwsh
@@ -901,16 +949,16 @@ jobs:
           New-Item -ItemType Directory -Force -Path "$src/cores" | Out-Null
           Copy-Item "app/windows/runner/sing-box.exe" "$src/cores/sing-box.exe" -Force
           Compress-Archive -Path "$src/*" `
-            -DestinationPath "dist/NexusVPN-${ver}-windows-portable.zip" -Force
-          Write-Host "✅ dist/NexusVPN-${ver}-windows-portable.zip"
+            -DestinationPath "dist/Nexus-${ver}-windows-portable.zip" -Force
+          Write-Host "✅ dist/Nexus-${ver}-windows-portable.zip"
           Get-ChildItem dist/ | Format-Table Name, Length
 
       - name: Validate Windows packages
         shell: pwsh
         run: |
           $ver = "${{ needs.version.outputs.version }}"
-          $setup = "dist/NexusVPN-$ver-windows-setup.exe"
-          $zip   = "dist/NexusVPN-$ver-windows-portable.zip"
+          $setup = "dist/Nexus-$ver-windows-setup.exe"
+          $zip   = "dist/Nexus-$ver-windows-portable.zip"
           if (-not (Test-Path $setup)) { throw "missing $setup" }
           if ((Get-Item $setup).Length -lt 1MB) { throw "setup.exe too small" }
           # Inno Setup PE header
@@ -1028,6 +1076,33 @@ jobs:
         working-directory: app
         run: flutter build macos --release --no-pub
 
+      # Flutter assets land under Frameworks/…/flutter_assets; also place a
+      # sidecar next to the executable so Process.start can always find it.
+      - name: Bundle sing-box sidecar into .app
+        run: |
+          set -euo pipefail
+          APP_PATH=$(find app/build/macos/Build/Products/Release \
+                        -maxdepth 1 -name "*.app" | head -1)
+          [ -n "$APP_PATH" ] || { echo "❌ No .app found"; exit 1; }
+          CORE="app/assets/cores/sing-box"
+          [ -f "$CORE" ] || { echo "❌ missing $CORE"; exit 1; }
+          MACOS_DIR="$APP_PATH/Contents/MacOS"
+          RES_CORES="$APP_PATH/Contents/Resources/cores"
+          cp "$CORE" "$MACOS_DIR/sing-box"
+          chmod +x "$MACOS_DIR/sing-box"
+          mkdir -p "$RES_CORES"
+          cp "$CORE" "$RES_CORES/sing-box"
+          chmod +x "$RES_CORES/sing-box"
+          echo "✅ sidecar: $(ls -lh "$MACOS_DIR/sing-box")"
+          # Assert asset path also present (used by CoreLocator extract fallback)
+          ASSET=$(find "$APP_PATH/Contents/Frameworks" -path '*/assets/cores/sing-box' | head -1 || true)
+          if [ -n "$ASSET" ]; then
+            chmod +x "$ASSET" || true
+            echo "✅ asset: $ASSET"
+          else
+            echo "::warning::flutter_assets cores/sing-box not found (sidecar still present)"
+          fi
+
       - name: Install create-dmg
         run: brew install create-dmg
 
@@ -1054,10 +1129,10 @@ jobs:
           chmod +x app/packaging/macos/sign_and_notarize.sh
           bash app/packaging/macos/sign_and_notarize.sh \
             "$APP_PATH" \
-            "dist/NexusVPN-${VERSION}-macos.dmg"
+            "dist/Nexus-${VERSION}-macos.dmg"
           echo "✅ $(ls -lh dist/*.dmg)"
 
-      - name: Package unsigned DMG (no Developer ID secrets)
+      - name: Package locally signed DMG (no Developer ID secrets)
         if: ${{ env.HAS_MACOS_CERT != 'true' }}
         run: |
           set -euo pipefail
@@ -1071,23 +1146,29 @@ jobs:
             echo "❌ No .app found in Release folder" && exit 1
           fi
           APP_NAME=$(basename "$APP_PATH")
-          echo "📦 Packaging UNSIGNED: $APP_NAME"
-          echo "::warning::macOS DMG is unsigned. Gatekeeper will block until Developer ID + notarization secrets are configured. See docs/CODE_SIGNING.md"
+          echo "🔏 Signing with generated local certificate: $APP_NAME"
+          chmod +x app/packaging/macos/sign_local.sh
+          if ! app/packaging/macos/sign_local.sh "$APP_PATH"; then
+            echo "::warning::Local certificate signing failed; falling back to ad-hoc signature"
+            codesign --deep --force --sign - "$APP_PATH"
+            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+          fi
+          echo "::warning::Local/ad-hoc signing is not Apple-trusted. Gatekeeper will still warn until Developer ID + notarization secrets are configured."
 
           create-dmg \
-            --volname "Nexus VPN" \
+            --volname "Nexus" \
             --window-size 540 380 \
             --icon-size 128 \
             --icon "${APP_NAME}" 160 190 \
             --app-drop-link 380 190 \
             --no-internet-enable \
-            "dist/NexusVPN-${VERSION}-macos.dmg" \
+            "dist/Nexus-${VERSION}-macos.dmg" \
             "${APP_PATH}" || {
               STATUS=$?
-              # create-dmg exits 2 when no code-signing is configured;
-              # the .dmg is still usable (just unsigned)
+              # create-dmg may exit 2 for a locally signed, non-notarized app;
+              # the .dmg is still usable.
               [ $STATUS -eq 2 ] || exit $STATUS
-              echo "⚠️  create-dmg exited $STATUS (no codesign — DMG is unsigned but valid)"
+              echo "⚠️  create-dmg exited $STATUS (local signature, not notarized)"
             }
           echo "✅ $(ls -lh dist/*.dmg)"
 
@@ -1154,7 +1235,7 @@ jobs:
           mkdir "$PAYLOAD_DIR"
           cp -r "$RUNNER_APP" "$PAYLOAD_DIR/"
           ( cd "$(dirname "$PAYLOAD_DIR")" && \
-            zip -qr "${GITHUB_WORKSPACE}/dist/NexusVPN-${VERSION}-ios-unsigned.ipa" Payload/ )
+            zip -qr "${GITHUB_WORKSPACE}/dist/Nexus-${VERSION}-ios-unsigned.ipa" Payload/ )
           echo "✅ $(ls -lh dist/*.ipa)"
 
       - name: Log iOS build result
@@ -1168,8 +1249,8 @@ jobs:
         run: |
           set -euo pipefail
           VERSION="${{ needs.version.outputs.version }}"
-          DMG="dist/NexusVPN-${VERSION}-macos.dmg"
-          IPA="dist/NexusVPN-${VERSION}-ios-unsigned.ipa"
+          DMG="dist/Nexus-${VERSION}-macos.dmg"
+          IPA="dist/Nexus-${VERSION}-ios-unsigned.ipa"
 
           # DMG must exist and be non-trivial
           test -f "$DMG"
@@ -1233,7 +1314,10 @@ jobs:
     name: GitHub Release
     runs-on: ubuntu-latest
     needs: [version, all-builds]
+    # Only push→main (or unmatched tag rebuild) publishes. PR builds never release.
     if: needs.version.outputs.is_release == 'true' && needs.all-builds.result == 'success'
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1263,18 +1347,18 @@ jobs:
 
           # Required for a complete multi-platform release (all platforms)
           REQUIRED=(
-            "NexusVPN-${VERSION}-macos.dmg"
-            "NexusVPN-${VERSION}-windows-setup.exe"
-            "NexusVPN-${VERSION}-windows-portable.zip"
-            "NexusVPN-${VERSION}-linux-x86_64.AppImage"
-            "NexusVPN-${VERSION}-linux-amd64.deb"
-            "NexusVPN-${VERSION}-linux-x86_64.rpm"
-            "NexusVPN-${VERSION}-android-universal.apk"
-            "NexusVPN-${VERSION}-android-arm64-v8a.apk"
-            "NexusVPN-${VERSION}-android-armeabi-v7a.apk"
-            "NexusVPN-${VERSION}-android-x86_64.apk"
-            "NexusVPN-${VERSION}-android-play.aab"
-            "NexusVPN-${VERSION}-ios-unsigned.ipa"
+            "Nexus-${VERSION}-macos.dmg"
+            "Nexus-${VERSION}-windows-setup.exe"
+            "Nexus-${VERSION}-windows-portable.zip"
+            "Nexus-${VERSION}-linux-x86_64.AppImage"
+            "Nexus-${VERSION}-linux-amd64.deb"
+            "Nexus-${VERSION}-linux-x86_64.rpm"
+            "Nexus-${VERSION}-android-universal.apk"
+            "Nexus-${VERSION}-android-arm64-v8a.apk"
+            "Nexus-${VERSION}-android-armeabi-v7a.apk"
+            "Nexus-${VERSION}-android-x86_64.apk"
+            "Nexus-${VERSION}-android-play.aab"
+            "Nexus-${VERSION}-ios-unsigned.ipa"
           )
 
           MISSING=0
@@ -1329,7 +1413,7 @@ jobs:
       - name: Create GitHub Release (+ auto tag on main)
         uses: softprops/action-gh-release@v2
         with:
-          name: "Nexus VPN v${{ needs.version.outputs.version }}"
+          name: "Nexus v${{ needs.version.outputs.version }}"
           # On main: creates vX.Y.0 tag automatically — no manual `git tag` needed.
           # On tag push: uses the pushed tag name.
           tag_name: ${{ needs.version.outputs.tag_name }}
@@ -1343,3 +1427,45 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fail_on_unmatched_files: true
           generate_release_notes: false
+
+      # Keep newest 2 Releases (current + previous). Delete 上上一个 and older.
+      - name: Prune older Releases (keep latest 2)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          KEEP_RELEASES: '2'
+        run: |
+          set -euo pipefail
+          KEEP="${KEEP_RELEASES}"
+          CURRENT="${{ needs.version.outputs.tag_name }}"
+
+          # Newest first by creation time
+          mapfile -t TAGS < <(
+            gh release list --repo "$GITHUB_REPOSITORY" --limit 50 \
+              --json tagName,createdAt \
+              --jq 'sort_by(.createdAt) | reverse | .[].tagName'
+          )
+
+          echo "📋 Releases (newest first): ${TAGS[*]:-none}"
+          echo "🔒 Keeping newest ${KEEP}; current tag=${CURRENT}"
+
+          if ((${#TAGS[@]} <= KEEP)); then
+            echo "ℹ️  ${#TAGS[@]} release(s) ≤ keep=${KEEP} — nothing to prune"
+            exit 0
+          fi
+
+          for ((i=KEEP; i<${#TAGS[@]}; i++)); do
+            TAG="${TAGS[$i]}"
+            # Never delete the release we just published
+            if [[ "$TAG" == "$CURRENT" ]]; then
+              echo "⏭  skip current $TAG"
+              continue
+            fi
+            echo "🗑  Deleting old release + tag: $TAG"
+            gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag \
+              || gh release delete "$TAG" --repo "$GITHUB_REPOSITORY" --yes || true
+            # Fallback if --cleanup-tag unsupported on older gh
+            git push origin ":refs/tags/${TAG}" 2>/dev/null || true
+          done
+
+          echo "✅ Retention done. Remaining:"
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 10
