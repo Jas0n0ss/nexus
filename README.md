@@ -1,167 +1,179 @@
+<!-- README-I18N:START -->
+**English** | [简体中文](./README.zh-CN.md)
+<!-- README-I18N:END -->
+
 <div align="center">
 
-<img src="app/assets/icons/app_icon_512.png" width="128" height="128" alt="Nexus VPN Logo"/>
+<img src="app/assets/icons/app_icon_512.png" width="112" height="112" alt="Nexus VPN"/>
 
-# Nexus
+# Nexus VPN
 
-**一套界面，五端可用的现代 VPN 客户端**
+**One client. Five platforms. Powered by sing-box.**
 
-基于 [sing-box](https://github.com/SagerNet/sing-box) 内核与 Flutter 构建，把常见代理协议、订阅导入和系统级流量接管收进同一款应用——桌面与移动端共享一致的体验。
+A cross-platform proxy client for self-hosted and subscription-based setups —
+import nodes, fix common config issues, and connect with a consistent desktop
+and mobile experience.
 
 [![CI](https://img.shields.io/github/actions/workflow/status/Jas0n0ss/nexus/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/Jas0n0ss/nexus/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/github/v/release/Jas0n0ss/nexus?style=flat-square&color=3b82f6)](https://github.com/Jas0n0ss/nexus/releases)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-lightgrey?style=flat-square)](#下载)
-[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![Release](https://img.shields.io/github/v/release/Jas0n0ss/nexus?style=flat-square&color=0d9488)](https://github.com/Jas0n0ss/nexus/releases/latest)
+[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-24292f?style=flat-square)](#downloads)
+[![License](https://img.shields.io/badge/license-MIT-green?style=flat-square)](LICENSE)
+[![sing-box](https://img.shields.io/badge/core-sing--box%201.9.x-orange?style=flat-square)](https://github.com/SagerNet/sing-box)
 
-[**下载**](#下载) · [**快速上手**](#快速上手) · [**功能一览**](#功能一览) · [**项目结构**](STRUCTURE.md)
+[Download](#downloads) · [Quick start](#quick-start) · [Features](#features) · [Build](app/BUILD.md) · [Architecture](STRUCTURE.md)
 
 </div>
 
 ---
 
-## 为什么是 Nexus
+## Why Nexus
 
-用脚本部署节点不难，难的是客户端：协议多、订阅格式乱、配置容易踩坑，桌面和手机还要各找一套工具。
+Deploying a node with a script is easy. Running a **reliable client** across
+phones and desktops is not — protocols differ, subscription formats conflict,
+and small config mistakes break connectivity.
 
-Nexus 面向这个问题：
+Nexus focuses on that gap:
 
-- **一处导入** — 订阅链接、单节点 URI、配置文件，都能直接进应用
-- **自动纠错** — 导入时修复常见不兼容项，减少“连不上再手工改 JSON”
-- **真正跨平台** — macOS / Windows / Linux / iOS / Android 同一套产品逻辑
-- **内核统一** — 底层由 sing-box 承载，协议与分流能力跟上主流生态
+| | |
+|---|---|
+| **Unified import** | Subscription URL, share URI, or local config file |
+| **Autofix on import** | Corrects common incompatibilities before you connect |
+| **True cross-platform** | macOS · Windows · Linux · iOS · Android, same product model |
+| **sing-box core** | Modern protocols, routing, and TUN / system-proxy paths |
 
-适合自建节点用户、多协议订阅用户，以及希望桌面端与手机端体验一致的人。
+Built for people who run their own infrastructure, use multi-protocol
+subscriptions, or want one client that behaves the same everywhere.
 
 ---
 
-## 功能一览
+## Features
 
-### 多协议
+### Protocols
 
-| 协议 | 传输 | 安全 |
-|------|------|------|
+| Protocol | Transport | Security |
+|----------|-----------|----------|
 | **VLESS** | TCP / WebSocket / gRPC | REALITY / TLS |
-| **VMess** | TCP / WebSocket / gRPC | TLS / None |
+| **VMess** | TCP / WebSocket / gRPC | TLS / none |
 | **Trojan** | TCP / WebSocket / gRPC | TLS |
 | **Shadowsocks** | TCP / UDP | AEAD-2022 / AES-GCM |
 | **Hysteria 2** | QUIC | TLS |
 | **TUIC v5** | QUIC | TLS |
-| **WireGuard** | UDP | 内置加密 |
+| **WireGuard** | UDP | Built-in |
 
-### 一键导入
+### Import sources
 
-支持从常见服务端部署脚本产出的订阅与配置直接导入：
-
-| 服务端脚本 | 常见格式 |
-|-----------|---------|
+| Server toolkit | Typical format |
+|----------------|----------------|
 | [233boy/sing-box](https://github.com/233boy/sing-box) | sing-box JSON / URI |
 | [233boy/Xray](https://github.com/233boy/Xray) | Xray JSON / URI |
-| [233boy/v2ray](https://github.com/233boy/v2ray) | Base64 订阅 / `vmess://` |
-| [mack-a/v2ray-agent](https://github.com/mack-a/v2ray-agent) | 多协议订阅 |
+| [233boy/v2ray](https://github.com/233boy/v2ray) | Base64 subscription / `vmess://` |
+| [mack-a/v2ray-agent](https://github.com/mack-a/v2ray-agent) | Multi-protocol subscription |
 | [yonggekkk/sing-box-yg](https://github.com/yonggekkk/sing-box-yg) | sing-box JSON |
 
-导入方式：
+Also supported: Clash YAML, Base64 URI lists, and `file://` local paths.
 
-- **订阅 URL**
-- **URI 粘贴**（`vless://` `vmess://` `trojan://` `ss://` `hysteria2://` `tuic://` `wg://`）
-- **本地配置文件**
+### Autofix (examples)
 
-### 自动修复
+- VMess `encryption: auto` → sing-box-compatible value  
+- gRPC ALPN alignment to reduce handshake failures  
+- Hysteria2 / TUIC vs TCP mux conflict handling  
+- Missing Trojan / VLESS SNI filled when possible  
+- REALITY fingerprint defaults  
+- Shadowsocks 2022 key format checks  
 
-导入后会尽量自动处理常见配置问题，例如：
+### Client experience
 
-- VMess `encryption: auto` → 兼容 sing-box 的取值
-- gRPC ALPN 对齐，降低握手失败
-- Hysteria2 / TUIC 与 TCP Mux 冲突时自动调整
-- Trojan / VLESS 缺失 SNI 时补全
-- REALITY 缺少 fingerprint 时给出合理默认
-- Shadowsocks 2022 密钥格式校验
-
-### 界面与体验
-
-Apple 风格的轻量界面：毛玻璃卡片、大号连接按钮、实时上下行曲线、深色 / 浅色跟随系统。桌面端左侧导航，移动端底部标签栏——同一产品，适配不同形态。
-
-### 分流
-
-连接后可按场景切换：
-
-- **规则分流** — 国内流量直连，并配合广告屏蔽规则
-- **全局代理**
-- **直连**
+- **Graphite Tide** UI — graphite surfaces, teal accent, Syne + IBM Plex Sans  
+- Desktop sidebar / mobile tab shell  
+- Live up/down throughput, latency probes, connection dashboard  
+- Route modes: **rule** · **global** · **direct** (with optional ads block)
 
 ---
 
-## 它如何工作
-
-对用户来说，路径很短：
+## How it works
 
 ```
-导入订阅 / URI → 自动修复 → 选节点测延迟 → 一键连接 → 仪表盘看状态与速率
+Import URL / URI / file  →  Autofix  →  Pick node & test  →  Connect  →  Dashboard
 ```
 
-对系统来说，各平台用合适的方式接管流量：
-
-| 平台 | 流量接管 |
-|------|---------|
+| Platform | Traffic path |
+|----------|--------------|
 | Android | `VpnService` + sing-box |
-| iOS | Network Extension（Packet Tunnel） |
-| Windows | WinTUN 虚拟网卡 |
-| macOS / Linux | sing-box 内核 + 系统代理 |
+| iOS | Network Extension (Packet Tunnel) |
+| Windows | WinTUN + sing-box |
+| macOS / Linux | sing-box process (+ system proxy when TUN is off) |
 
-更细的模块划分见 [STRUCTURE.md](STRUCTURE.md)；浏览器里可直接打开 [`nexus-vpn-preview.html`](nexus-vpn-preview.html) 预览界面风格。
-
----
-
-## 下载
-
-| 平台 | 包类型 | 说明 |
-|------|--------|------|
-| macOS | `.dmg` | 拖入 Applications（Apple Silicon + Intel） |
-| Windows | 安装包 / 便携 ZIP | 安装包含 WinTUN |
-| Linux | AppImage / `.deb` / `.rpm` | 常见发行版可直接用 |
-| Android | 通用 APK（推荐）/ 分 ABI APK / Play AAB | 手机请装 `.apk`，不要下 `.aab` |
-| iOS | 未签名 IPA | 需侧载（AltStore / TrollStore 等） |
-
-正式版本见 [Releases](https://github.com/Jas0n0ss/nexus/releases/latest)。  
-每次推送到 `main` 也会产出全平台构建，可在 [Actions](https://github.com/Jas0n0ss/nexus/actions/workflows/ci.yml) 对应运行的 Artifacts 中下载。
-
-> **macOS「Apple could not verify…」？**  
-> 未配置 Apple Developer ID + 公证时，Gatekeeper 会拦截。临时：右键应用 → 打开。  
-> 要让安装包被系统默认信任，需配置签名证书 — 见 **[代码签名指南](docs/CODE_SIGNING.md)**。
+UI preview (static): [`nexus-vpn-preview.html`](nexus-vpn-preview.html)  
+Module map: [STRUCTURE.md](STRUCTURE.md)
 
 ---
 
-## 快速上手
+## Downloads
 
-1. **导入** — 打开「导入」，粘贴订阅链接或单节点 URI  
-2. **选择** — 在「节点」里测延迟，选延迟最低的节点  
-3. **连接** — 回到仪表盘，点连接按钮  
+| Platform | Package | Notes |
+|----------|---------|--------|
+| macOS | `.dmg` | Apple Silicon + Intel |
+| Windows | Setup `.exe` / portable ZIP | Installer includes WinTUN |
+| Linux | AppImage / `.deb` / `.rpm` | Common distros |
+| Android | Universal APK (recommended) / per-ABI / Play AAB | Install `.apk`, not `.aab` |
+| iOS | Unsigned IPA | Sideload (AltStore / TrollStore / …) |
 
-示例：
+**Stable builds:** [GitHub Releases](https://github.com/Jas0n0ss/nexus/releases/latest)  
+Every successful push to `main` publishes a versioned Release (CI keeps the **latest 2**).  
+PR builds produce artifacts only — merge to `main` to ship.
 
-```
-# 订阅
+> **macOS Gatekeeper (“Apple could not verify…”)**  
+> Unsigned DMGs are blocked until Developer ID + notarization secrets are configured.  
+> Workaround: right-click → Open. Full guide: [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md).
+
+---
+
+## Quick start
+
+1. **Import** — paste a subscription URL or node URI  
+2. **Select** — open Nodes, run latency test, pick a reachable server  
+3. **Connect** — return to the dashboard and tap Connect  
+
+```text
+# Subscription
 https://your.domain/sub?token=xxx
 
-# 单节点
-vless://uuid@host:443?encryption=none&security=reality&sni=yahoo.com&fp=chrome&pbk=xxx&type=tcp#节点名
+# Single node
+vless://uuid@host:443?encryption=none&security=reality&sni=www.example.com&fp=chrome&pbk=xxx&type=tcp#name
 ```
 
----
+**Local development requires the sing-box binary:**
 
-## 开发者
+```bash
+bash app/scripts/fetch_singbox.sh
+cd app && flutter pub get && flutter run
+```
 
-本地构建、平台脚手架、sing-box 内核准备，见 [app/BUILD.md](app/BUILD.md)。  
-**让 macOS / Windows / iOS / Android 安装包被系统信任**：见 [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md)。  
-代码目录与职责说明见 [STRUCTURE.md](STRUCTURE.md)。
-
-**合并到 `main` 后会自动发版**：CI 全平台构建成功 → 自动递增版本（如 `v0.11.0` → `v0.12.0`）并创建 GitHub Release。  
-仓库只保留最新 **2** 个 Release（删除更旧的 tag/发布）。  
-PR 上的 CI 只会构建产物，**不会**发 Release——需要合并进 `main`。  
-也可手动推送 `v*.*.*` 标签触发发版。
+Details: [app/BUILD.md](app/BUILD.md)
 
 ---
 
-## 许可证
+## Development
 
-[MIT License](LICENSE)
+| Doc | Topic |
+|-----|--------|
+| [app/BUILD.md](app/BUILD.md) | Flutter scaffold, cores, platform packages |
+| [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) | Developer ID / Authenticode / Play / iOS trust |
+| [STRUCTURE.md](STRUCTURE.md) | Repository layout & module responsibilities |
+
+### Release pipeline
+
+| Event | Result |
+|-------|--------|
+| Push / merge → **`main`** | Full matrix build → auto version bump → GitHub Release |
+| Pull request | Lint, test, packages as CI artifacts (**no** Release) |
+| Tag `v*.*.*` | Rebuild + Release (skipped if that Release already exists) |
+
+Version scheme (patch always `.0`): `0.10 → 0.11 → … → 0.19 → 1.1 → …`  
+Retention: only the **two newest** Releases are kept; older tags/releases are pruned.
+
+---
+
+## License
+
+Released under the [MIT License](LICENSE).
