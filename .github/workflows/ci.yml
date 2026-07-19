@@ -801,13 +801,18 @@ jobs:
             "windows\runner\resources\app_icon.ico" -Force
           # Keep the executable filename for compatibility; normalize all
           # user-visible Windows metadata to Nexus.
+          # NOTE: use plain " in single-quoted PowerShell patterns — \" writes a
+          # literal backslash into Runner.rc and breaks rc.exe (RC2104).
           $rc = "windows\runner\Runner.rc"
-          (Get-Content $rc) `
-            -replace 'VALUE \"FileDescription\", \".*\"', 'VALUE \"FileDescription\", \"Nexus\"' `
-            -replace 'VALUE \"InternalName\", \".*\"', 'VALUE \"InternalName\", \"Nexus\"' `
-            -replace 'VALUE \"ProductName\", \".*\"', 'VALUE \"ProductName\", \"Nexus\"' |
-            Set-Content $rc
-          Write-Host "✅ Windows scaffold created; installer script restored:"
+          $patched = (Get-Content -Raw $rc) `
+            -replace 'VALUE "CompanyName", "[^"]*"', 'VALUE "CompanyName", "Nexus"' `
+            -replace 'VALUE "FileDescription", "[^"]*"', 'VALUE "FileDescription", "Nexus"' `
+            -replace 'VALUE "InternalName", "[^"]*"', 'VALUE "InternalName", "Nexus"' `
+            -replace 'VALUE "ProductName", "[^"]*"', 'VALUE "ProductName", "Nexus"'
+          Set-Content -Path $rc -Value $patched -Encoding ascii -NoNewline
+          Write-Host "✅ Windows scaffold created; Runner.rc metadata patched:"
+          Select-String -Path $rc -Pattern 'VALUE "(CompanyName|FileDescription|InternalName|ProductName)"'
+          Write-Host "✅ installer script restored:"
           Get-ChildItem windows\installer\ | Format-Table Name
 
       - name: flutter pub get
