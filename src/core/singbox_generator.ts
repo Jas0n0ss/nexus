@@ -1,5 +1,5 @@
 /**
- * Nexus VPN — sing-box JSON Config Generator
+ * Nexus — sing-box JSON Config Generator
  * Converts ProxyNode[] → complete sing-box config.json
  * Supports sing-box 1.9.x schema
  */

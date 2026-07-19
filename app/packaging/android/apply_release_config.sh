@@ -41,11 +41,11 @@ for p in perms:
         )
 
 # Human-readable app label
-text = re.sub(r'android:label="[^"]*"', 'android:label="Nexus VPN"', text, count=1)
+text = re.sub(r'android:label="[^"]*"', 'android:label="Nexus"', text, count=1)
 
 service = '''
         <service
-            android:name="com.nexusvpn.NexusVpnService"
+            android:name="com.nexusvpn.NexusTunnelService"
             android:exported="false"
             android:permission="android.permission.BIND_VPN_SERVICE"
             android:foregroundServiceType="specialUse">
@@ -57,7 +57,7 @@ service = '''
                 android:value="vpn" />
         </service>
 '''
-if "NexusVpnService" not in text:
+if "NexusTunnelService" not in text:
     text = text.replace("</application>", service + "    </application>", 1)
 
 path.write_text(text, encoding="utf-8")

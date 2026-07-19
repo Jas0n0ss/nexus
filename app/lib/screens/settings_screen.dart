@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/settings_provider.dart';
-import '../providers/vpn_provider.dart';
+import '../providers/session_provider.dart';
 import '../widgets/nexus_surface.dart';
 import '../widgets/page_header.dart';
 
@@ -68,8 +68,8 @@ Future<void> _set(
   bool reload = false,
 }) async {
   context.read<SettingsProvider>().set(fn);
-  if (reload && context.read<VpnProvider>().isConnected) {
-    await context.read<VpnProvider>().applySettingsAndReconnect();
+  if (reload && context.read<SessionProvider>().isConnected) {
+    await context.read<SessionProvider>().applySettingsAndReconnect();
   }
 }
 
@@ -189,8 +189,12 @@ class _AutoBlock extends StatelessWidget {
   Widget build(BuildContext context) {
     final s = context.watch<SettingsProvider>();
     return _Section(
-      title: '自动化',
+      title: '自动化 · 高可用',
       children: [
+        _SwitchRow('自动故障转移', '探测失败后切换备用节点（Passwall 风格）', s.autoFailover,
+            (v) => context.read<SettingsProvider>().set((x) => x.autoFailover = v)),
+        _SwitchRow('恢复主节点', '主节点恢复后自动切回', s.restorePrimary,
+            (v) => context.read<SettingsProvider>().set((x) => x.restorePrimary = v)),
         _SwitchRow('自动重连', '断线后恢复', s.autoReconnect,
             (v) => context.read<SettingsProvider>().set((x) => x.autoReconnect = v)),
         _SwitchRow('崩溃重启', '核心退出后拉起', s.crashAutoRestart,

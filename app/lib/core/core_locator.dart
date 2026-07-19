@@ -74,7 +74,7 @@ class CoreLocator {
       paths.addAll([
         '/usr/bin/sing-box',
         '/usr/lib/nexus-vpn/data/flutter_assets/assets/cores/sing-box',
-        '/usr/lib/nexus_vpn/data/flutter_assets/assets/cores/sing-box',
+        '/usr/lib/nexus/data/flutter_assets/assets/cores/sing-box',
       ]);
     }
 
@@ -90,6 +90,7 @@ class CoreLocator {
         '/data/data/com.nexusvpn.nexus_vpn/files/sing-box',
         '/data/data/com.nexusvpn.nexus_vpn/files/cores/sing-box',
         '/data/data/com.nexusvpn.nexusVpn/files/sing-box',
+        '/data/data/com.nexus.app/files/sing-box',
       ]);
     }
 

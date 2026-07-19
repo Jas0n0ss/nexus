@@ -1,5 +1,5 @@
 /**
- * Nexus VPN — Universal Node Parser
+ * Nexus — Universal Node Parser
  * Supports: vmess:// vless:// trojan:// ss:// hysteria2:// tuic:// wg://
  * Script sources: 233boy/sing-box, 233boy/Xray, 233boy/v2ray,
  *                 mack-a/v2ray-agent, yonggekkk/sing-box-yg

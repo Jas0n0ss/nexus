@@ -8,12 +8,12 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 /**
- * Bridges Flutter MethodChannel `com.nexusvpn/vpn` to [NexusVpnService].
+ * Bridges Flutter MethodChannel `com.nexus/proxy` to [NexusTunnelService].
  * Restored by apply_release_config.sh after `flutter create`.
  */
 class MainActivity : FlutterActivity() {
     companion object {
-        private const val CHANNEL = "com.nexusvpn/vpn"
+        private const val CHANNEL = "com.nexus/proxy"
         private const val REQ_VPN = 1001
     }
 
@@ -25,7 +25,7 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "startVpn" -> {
+                    "startTunnel", "startVpn" -> {
                         val config = call.argument<String>("config")
                         if (config.isNullOrEmpty()) {
                             result.error("INVALID_ARGS", "config required", null)
@@ -33,9 +33,9 @@ class MainActivity : FlutterActivity() {
                         }
                         prepareAndStart(config, result)
                     }
-                    "stopVpn" -> {
-                        val intent = Intent(this, NexusVpnService::class.java).apply {
-                            action = NexusVpnService.ACTION_STOP
+                    "stopTunnel", "stopVpn" -> {
+                        val intent = Intent(this, NexusTunnelService::class.java).apply {
+                            action = NexusTunnelService.ACTION_STOP
                         }
                         startService(intent)
                         result.success(true)
@@ -68,9 +68,9 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun startVpnService(config: String) {
-        val intent = Intent(this, NexusVpnService::class.java).apply {
-            action = NexusVpnService.ACTION_START
-            putExtra(NexusVpnService.EXTRA_CONFIG, config)
+        val intent = Intent(this, NexusTunnelService::class.java).apply {
+            action = NexusTunnelService.ACTION_START
+            putExtra(NexusTunnelService.EXTRA_CONFIG, config)
         }
         startForegroundService(intent)
     }
@@ -87,7 +87,7 @@ class MainActivity : FlutterActivity() {
             startVpnService(config)
             result?.success(true)
         } else {
-            result?.error("VPN_PERMISSION", "User denied VPN permission", null)
+            result?.error("TUNNEL_PERMISSION", "User denied tunnel permission", null)
         }
     }
 }

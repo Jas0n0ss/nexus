@@ -21,7 +21,7 @@ typedef void (WINAPI *CloseAdapter_t)(WINTUN_ADAPTER_HANDLE);
 typedef WINTUN_SESSION_HANDLE (WINAPI *StartSession_t)(WINTUN_ADAPTER_HANDLE, DWORD);
 typedef void (WINAPI *EndSession_t)(WINTUN_SESSION_HANDLE);
 
-namespace nexus_vpn {
+namespace nexus {
 
 static HANDLE g_singboxProcess = NULL;
 static HMODULE g_wintun = NULL;
@@ -29,7 +29,7 @@ static WINTUN_ADAPTER_HANDLE g_adapter = NULL;
 
 void VpnChannel::RegisterWithRegistrar(flutter::PluginRegistrarWindows* registrar) {
     auto channel = std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
-        registrar->messenger(), "com.nexusvpn/vpn",
+        registrar->messenger(), "com.nexus/proxy",
         &flutter::StandardMethodCodec::GetInstance());
 
     auto plugin = std::make_unique<VpnChannel>();
@@ -47,14 +47,14 @@ void VpnChannel::HandleMethodCall(
 {
     const auto& method = call.method_name();
 
-    if (method == "startVpn") {
+    if (method == "startVpn" || method == "startTunnel") {
         auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
         if (!args) { result->Error("INVALID_ARGS", "Expected map"); return; }
 
         const auto& configJson = std::get<std::string>(args->at(flutter::EncodableValue("config")));
         StartVpn(configJson, std::move(result));
     }
-    else if (method == "stopVpn") {
+    else if (method == "stopVpn" || method == "stopTunnel") {
         StopVpn(std::move(result));
     }
     else if (method == "getStats") {
@@ -204,4 +204,4 @@ void VpnChannel::ClearSystemProxy() {
     InternetSetOptionA(NULL, INTERNET_OPTION_REFRESH, NULL, 0);
 }
 
-} // namespace nexus_vpn
+} // namespace nexus

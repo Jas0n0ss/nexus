@@ -1,5 +1,5 @@
-name: nexus_vpn
-description: Nexus VPN — Cross-platform VPN client supporting VLESS/VMess/Trojan/Shadowsocks/Hysteria2/TUIC/WireGuard
+name: nexus
+description: Nexus — cross-platform proxy client (sing-box) with multi-node failover
 version: 1.0.0+1
 publish_to: none
 

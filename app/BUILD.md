@@ -1,4 +1,4 @@
-# Nexus VPN — Build Guide
+# Nexus — Build Guide
 
 ## Prerequisites
 
@@ -85,14 +85,14 @@ flutter build macos --release
 # Package as DMG
 brew install create-dmg
 create-dmg \
-  --volname "Nexus VPN" \
+  --volname "Nexus" \
   --background "macos/dmg-background.png" \
   --window-size 540 380 \
   --icon-size 128 \
-  --icon "Nexus VPN.app" 160 190 \
+  --icon "Nexus.app" 160 190 \
   --app-drop-link 380 190 \
-  "Nexus VPN.dmg" \
-  "build/macos/Build/Products/Release/Nexus VPN.app"
+  "Nexus.dmg" \
+  "build/macos/Build/Products/Release/Nexus.app"
 ```
 
 **Required Entitlements (macos/Runner/*.entitlements):**
@@ -175,10 +175,10 @@ cask "nexus-vpn" do
   version "1.0.0"
   sha256 "..."
   url "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-1.0.0.dmg"
-  name "Nexus VPN"
-  desc "Cross-platform VPN client supporting VLESS/Hysteria2/TUIC"
+  name "Nexus"
+  desc "Cross-platform proxy client supporting VLESS/Hysteria2/TUIC"
   homepage "https://github.com/yourorg/nexus-vpn"
-  app "Nexus VPN.app"
+  app "Nexus.app"
 end
 ```
 
@@ -187,7 +187,7 @@ end
 # manifests/y/yourorg/nexusvpn/1.0.0/yourorg.nexusvpn.yaml
 PackageIdentifier: yourorg.nexusvpn
 PackageVersion: 1.0.0
-PackageName: Nexus VPN
+PackageName: Nexus
 Installers:
   - Architecture: x64
     InstallerType: inno
@@ -198,7 +198,7 @@ Installers:
 ```json
 {
   "version": "1.0.0",
-  "description": "Nexus VPN — cross-platform VPN client",
+  "description": "Nexus — cross-platform proxy client",
   "url": "https://github.com/yourorg/nexus-vpn/releases/download/v1.0.0/NexusVPN-portable.zip",
   "bin": "nexus_vpn.exe"
 }

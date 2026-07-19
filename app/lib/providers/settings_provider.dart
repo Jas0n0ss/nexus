@@ -26,6 +26,14 @@ class SettingsProvider extends ChangeNotifier {
   int mixedPort = 7890;
   String? lastSubscriptionUrl;
 
+  // High availability (Passwall socks_auto_switch style)
+  bool autoFailover = true;          // probe + switch to backup nodes
+  bool restorePrimary = true;        // switch back when primary recovers
+  int failoverIntervalSec = 30;      // health check interval
+  int failoverTimeoutSec = 3;        // probe connect timeout
+  int failoverRetries = 1;           // probe retries
+  String probeUrl = 'https://www.google.com/generate_204';
+
   SettingsProvider() { _load(); }
 
   Future<void> _load() async {
@@ -48,6 +56,12 @@ class SettingsProvider extends ChangeNotifier {
     preferIpv4         = p.getBool('preferIpv4') ?? true;
     mixedPort          = p.getInt('mixedPort') ?? 7890;
     lastSubscriptionUrl = p.getString('lastSub');
+    autoFailover       = p.getBool('autoFailover') ?? true;
+    restorePrimary     = p.getBool('restorePrimary') ?? true;
+    failoverIntervalSec = p.getInt('failoverInterval') ?? 30;
+    failoverTimeoutSec  = p.getInt('failoverTimeout') ?? 3;
+    failoverRetries     = p.getInt('failoverRetries') ?? 1;
+    probeUrl            = p.getString('probeUrl') ?? 'https://www.google.com/generate_204';
     notifyListeners();
   }
 
@@ -73,6 +87,12 @@ class SettingsProvider extends ChangeNotifier {
     if (lastSubscriptionUrl != null) {
       await p.setString('lastSub', lastSubscriptionUrl!);
     }
+    await p.setBool('autoFailover', autoFailover);
+    await p.setBool('restorePrimary', restorePrimary);
+    await p.setInt('failoverInterval', failoverIntervalSec);
+    await p.setInt('failoverTimeout', failoverTimeoutSec);
+    await p.setInt('failoverRetries', failoverRetries);
+    await p.setString('probeUrl', probeUrl);
   }
 
   void set(void Function(SettingsProvider s) fn) {
