@@ -6,6 +6,7 @@ import '../providers/session_provider.dart';
 import '../providers/update_provider.dart';
 import '../theme/nexus_theme.dart';
 import '../widgets/nexus_surface.dart';
+import '../widgets/page_body.dart';
 import '../widgets/page_header.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -16,8 +17,7 @@ class SettingsScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 22, 24, 28),
+        child: PageBody(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

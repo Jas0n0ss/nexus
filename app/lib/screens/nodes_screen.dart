@@ -8,6 +8,7 @@ import '../providers/shell_nav.dart';
 import '../models/proxy_node.dart';
 import '../theme/nexus_theme.dart';
 import '../widgets/nexus_surface.dart';
+import '../widgets/page_body.dart';
 import '../widgets/page_header.dart';
 
 class NodesScreen extends StatelessWidget {
@@ -18,8 +19,8 @@ class NodesScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
+        child: PageBody(
+          scroll: false,
           child: Column(
             children: [
               Consumer<NodesProvider>(

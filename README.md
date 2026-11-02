@@ -76,6 +76,42 @@ Android can use a generated keystore today; macOS/Windows need paid Apple / CA c
 
 ---
 
+## Safe to install
+
+**Download from the official Releases page only** —
+https://github.com/Jas0n0ss/nexus/releases/latest — republished binaries
+elsewhere cannot be trusted.
+
+Every release ships `SHA256SUMS.txt`; verify before installing:
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS.txt
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+# Windows PowerShell
+Get-FileHash .\Nexus-*-windows-setup.exe -Algorithm SHA256
+# compare with the matching line in SHA256SUMS.txt
+```
+
+First-run warnings are a signing-status issue, not a corrupted file:
+
+| Platform | Prompt | What to do |
+|----------|--------|------------|
+| macOS | “Apple could not verify…” | System Settings → Privacy & Security → Open Anyway |
+| Windows | SmartScreen | More info → Run anyway |
+| Android | Unknown sources | Allow for this installer; the APK keeps a stable signature so upgrades work |
+| iOS | Unsigned IPA | Sideload it yourself (AltStore / self-signing tool) |
+
+Configure the certificates in [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) to remove
+these prompts. [app/packaging/android/README.md](app/packaging/android/README.md)
+explains the community keystore committed for CI convenience — swap it for a
+private keystore before distributing seriously.
+
+**Privacy** — node credentials (UUID / passwords) stay on-device; nothing is uploaded.
+
+---
+
 ## Quick start
 
 ```bash

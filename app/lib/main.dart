@@ -39,9 +39,15 @@ void main() async {
     ]);
   }
 
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+  // Status bar icons must follow the OS theme, or they vanish on light mode.
+  final platformBrightness = WidgetsBinding
+      .instance.platformDispatcher.platformBrightness;
+  SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: platformBrightness == Brightness.dark
+        ? Brightness.light
+        : Brightness.dark,
+    statusBarBrightness: platformBrightness,
   ));
 
   runApp(

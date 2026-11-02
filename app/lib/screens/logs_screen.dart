@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/logs_provider.dart';
 import '../theme/nexus_theme.dart';
 import '../widgets/nexus_surface.dart';
+import '../widgets/page_body.dart';
 import '../widgets/page_header.dart';
 
 class LogsScreen extends StatefulWidget {
@@ -39,8 +40,8 @@ class _LogsScreenState extends State<LogsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 20),
+        child: PageBody(
+          scroll: false,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -57,15 +58,30 @@ class _LogsScreenState extends State<LogsScreen> {
               const SizedBox(height: 14),
               Row(
                 children: [
-                  for (final f in const ['ALL', 'INFO', 'WARN', 'ERROR']) ...[
-                    _Chip(
-                      label: f,
-                      active: _filter == f,
-                      onTap: () => setState(() => _filter = f),
+                  // Chips scroll horizontally so narrow phones never overflow.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final f in const [
+                            'ALL',
+                            'INFO',
+                            'WARN',
+                            'ERROR'
+                          ]) ...[
+                            _Chip(
+                              label: f,
+                              active: _filter == f,
+                              onTap: () => setState(() => _filter = f),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                        ],
+                      ),
                     ),
-                    const SizedBox(width: 6),
-                  ],
-                  const Spacer(),
+                  ),
+                  const SizedBox(width: 8),
                   Text('自动滚动', style: Theme.of(context).textTheme.bodySmall),
                   Switch(
                     value: _autoScroll,

@@ -53,6 +53,7 @@ class ProxyNode extends HiveObject {
   @HiveField(28) final NodeSource source;
   @HiveField(29) final String? rawUri;
   @HiveField(30) final DateTime addedAt;
+  @HiveField(31) final String? flow;          // VLESS flow (e.g. xtls-rprx-vision)
 
   // Runtime (not persisted via Hive, updated in memory)
   int? latencyMs;
@@ -91,6 +92,7 @@ class ProxyNode extends HiveObject {
     this.dns,
     this.source = NodeSource.unknown,
     this.rawUri,
+    this.flow,
     DateTime? addedAt,
   }) : addedAt = addedAt ?? DateTime.now();
 
@@ -168,6 +170,7 @@ class ProxyNode extends HiveObject {
     'dns': dns,
     'source': source.name,
     'rawUri': rawUri,
+    'flow': flow,
     'addedAt': addedAt.toIso8601String(),
   };
 
@@ -208,6 +211,7 @@ class ProxyNode extends HiveObject {
       dns: json['dns'] as String?,
       source: enumByName(NodeSource.values, json['source'] as String?, NodeSource.unknown),
       rawUri: json['rawUri'] as String?,
+      flow: json['flow'] as String?,
       addedAt: DateTime.tryParse(json['addedAt'] as String? ?? '') ?? DateTime.now(),
     );
   }
@@ -243,6 +247,7 @@ class ProxyNode extends HiveObject {
     String? dns,
     NodeSource? source,
     String? rawUri,
+    String? flow,
     DateTime? addedAt,
     int? latencyMs,
     double? downloadMbps,
@@ -280,6 +285,7 @@ class ProxyNode extends HiveObject {
       dns: dns ?? this.dns,
       source: source ?? this.source,
       rawUri: rawUri ?? this.rawUri,
+      flow: flow ?? this.flow,
       addedAt: addedAt ?? this.addedAt,
     );
     n.latencyMs    = latencyMs    ?? this.latencyMs;

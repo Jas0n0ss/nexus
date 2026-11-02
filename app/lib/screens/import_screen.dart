@@ -8,6 +8,7 @@ import '../providers/settings_provider.dart';
 import '../providers/shell_nav.dart';
 import '../theme/nexus_theme.dart';
 import '../widgets/nexus_surface.dart';
+import '../widgets/page_body.dart';
 import '../widgets/page_header.dart';
 
 enum _ImportMode { url, uri, file }
@@ -91,8 +92,8 @@ class _ImportScreenState extends State<ImportScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+        child: PageBody(
+          maxWidth: 860,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -103,10 +104,12 @@ class _ImportScreenState extends State<ImportScreen> {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  for (final m in _ImportMode.values)
+                  for (final (i, m) in _ImportMode.values.indexed)
                     Expanded(
                       child: Padding(
-                        padding: const EdgeInsets.only(right: 8),
+                        padding: EdgeInsets.only(
+                          right: i == _ImportMode.values.length - 1 ? 0 : 8,
+                        ),
                         child: _ModeTab(
                           label: switch (m) {
                             _ImportMode.url => '订阅',

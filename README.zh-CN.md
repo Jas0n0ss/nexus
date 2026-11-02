@@ -75,7 +75,39 @@ Android 可用脚本生成 keystore；macOS / Windows 必须使用付费的 Appl
 
 ---
 
-## 快速上手
+## 安全使用
+
+**只用官方发布页**：https://github.com/Jas0n0ss/nexus/releases/latest
+（其他站点转载的安装包无法保证未被篡改。）
+
+每个 Release 都附带 `SHA256SUMS.txt`，下载后先校验：
+
+```bash
+# macOS
+shasum -a 256 -c SHA256SUMS.txt
+# Linux
+sha256sum -c SHA256SUMS.txt --ignore-missing
+# Windows PowerShell
+Get-FileHash .\Nexus-*-windows-setup.exe -Algorithm SHA256
+# 与 SHA256SUMS.txt 中对应行比对
+```
+
+首次运行提示属于签名状态问题，不代表文件损坏：
+
+| 平台 | 现象 | 处理 |
+|------|------|------|
+| macOS | “无法验证开发者” | 系统设置 → 隐私与安全性 → 仍要打开；或右键 → 打开 |
+| Windows | SmartScreen 蓝色提示 | 更多信息 → 仍要运行 |
+| Android | “未知来源”限制 | 允许该来源安装；安装包使用固定签名，可覆盖升级 |
+| iOS | 未签名 IPA | 需自行侧载（AltStore / 自签工具） |
+
+配置好 [docs/CODE_SIGNING.md](docs/CODE_SIGNING.md) 中的证书后即可消除上述提示；
+[app/packaging/android/README.md](app/packaging/android/README.md) 说明了仓库内社区
+keystore 的用途与替换方式（正式分发请换成私有 keystore）。
+
+**隐私**：节点配置（含 UUID / 密码）只保存在本机，不会上传；日志不会写入磁盘长期留存。
+
+---
 
 ```bash
 bash app/scripts/fetch_singbox.sh

@@ -1445,6 +1445,19 @@ jobs:
           COUNT=$(find release-flat -type f | wc -l | tr -d ' ')
           echo "Will upload ${COUNT} file(s) from release-flat/ to the GitHub Release"
 
+      # Publish checksums so users can verify what they downloaded.
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd release-flat
+          # Stable, deterministic listing of every package shipped in this release
+          find . -maxdepth 1 -type f ! -name 'SHA256SUMS.txt' -printf '%f\n' \
+            | sort | while IFS= read -r f; do
+                sha256sum "$f"
+              done > SHA256SUMS.txt
+          echo "----- SHA256SUMS.txt -----"
+          cat SHA256SUMS.txt
+
       - name: Generate release notes
         run: |
           set -euo pipefail
@@ -1472,6 +1485,13 @@ jobs:
             echo "### Changes"
             echo
             echo "$COMMITS"
+            echo
+            echo "### Verify your download"
+            echo
+            echo '```bash'
+            echo "# Linux:  sha256sum -c SHA256SUMS.txt --ignore-missing"
+            echo "# macOS:  shasum -a 256 -c SHA256SUMS.txt"
+            echo '```'
           } > release-notes.md
 
           echo "----- release-notes.md -----"

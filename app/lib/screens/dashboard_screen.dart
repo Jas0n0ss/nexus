@@ -10,6 +10,7 @@ import '../providers/shell_nav.dart';
 import '../theme/nexus_theme.dart';
 import '../widgets/connect_button.dart';
 import '../widgets/nexus_surface.dart';
+import '../widgets/page_body.dart';
 import '../widgets/page_header.dart';
 
 class DashboardScreen extends StatelessWidget {
@@ -20,8 +21,8 @@ class DashboardScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(28, 28, 28, 40),
+        child: PageBody(
+          extraBottom: 4,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -36,7 +37,7 @@ class DashboardScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 24),
               const _HeroConnect()
                   .animate()
                   .fadeIn(duration: 320.ms)
@@ -132,6 +133,8 @@ class _HeroConnect extends StatelessWidget {
                 const SizedBox(height: 12),
                 Text(
                   headline,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                         fontSize: 34,
                         color: isError ? NexusColors.danger : null,
@@ -192,10 +195,10 @@ class _RouteModes extends StatelessWidget {
         const SizedBox(height: 10),
         Row(
           children: [
-            for (final m in modes)
+            for (final (i, m) in modes.indexed)
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.only(right: 8),
+                  padding: EdgeInsets.only(right: i == modes.length - 1 ? 0 : 8),
                   child: NexusSurface(
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
                     borderColor: settings.routeMode == m.$1

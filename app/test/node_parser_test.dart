@@ -151,6 +151,60 @@ proxies:
     });
   });
 
+  group('Real-world URI fixtures', () {
+    final parser = NodeParser();
+    const realityUri =
+        'vless://06aad3ae-3e69-407e-8f49-ec0388d5b41f@20.2.114.89:4321'
+        '?encryption=none&security=reality&flow=xtls-rprx-vision&type=tcp'
+        '&sni=dash.cloudflare.com&pbk=zqeJ2aZnYNjcL88pqkKaeZ1oxAjcV6ZuAWydbyWYMwo'
+        '&fp=chrome#233boy-reality-20.2.114.89';
+
+    test('parses 233boy VLESS+REALITY URI end-to-end', () async {
+      final r = await parser.parse(realityUri);
+      expect(r.errors, isEmpty);
+      expect(r.nodes.length, 1);
+      final n = r.nodes.first;
+      expect(n.protocol, Protocol.vless);
+      expect(n.security, Security.reality);
+      expect(n.server, '20.2.114.89');
+      expect(n.port, 4321);
+      expect(n.uuid, '06aad3ae-3e69-407e-8f49-ec0388d5b41f');
+      expect(n.sni, 'dash.cloudflare.com');
+      expect(n.publicKey, 'zqeJ2aZnYNjcL88pqkKaeZ1oxAjcV6ZuAWydbyWYMwo');
+      expect(n.fingerprint, 'chrome');
+      expect(n.flow, 'xtls-rprx-vision');
+      expect(n.transport, Transport.tcp);
+      expect(n.name, contains('233boy-reality'));
+    });
+
+    test('generates valid sing-box config with flow + reality', () async {
+      final r = await parser.parse(realityUri);
+      final cfg = ConfigGenerator.generate(r.nodes.first, tunMode: false);
+      final ob = (cfg['outbounds'] as List).first as Map<String, dynamic>;
+      expect(ob['type'], 'vless');
+      expect(ob['server'], '20.2.114.89');
+      expect(ob['server_port'], 4321);
+      expect(ob['uuid'], '06aad3ae-3e69-407e-8f49-ec0388d5b41f');
+      expect(ob['flow'], 'xtls-rprx-vision');
+      final tls = ob['tls'] as Map<String, dynamic>;
+      expect(tls['enabled'], true);
+      expect(tls['server_name'], 'dash.cloudflare.com');
+      expect((tls['utls'] as Map)['fingerprint'], 'chrome');
+      final reality = tls['reality'] as Map<String, dynamic>;
+      expect(reality['enabled'], true);
+      expect(reality['public_key'], 'zqeJ2aZnYNjcL88pqkKaeZ1oxAjcV6ZuAWydbyWYMwo');
+      // JSON must be serializable (what gets written to disk for the core)
+      expect(jsonEncode(cfg), isNotEmpty);
+    });
+
+    test('roundtrip preserves flow through toJson/fromJson', () async {
+      final r = await parser.parse(realityUri);
+      final again = ProxyNode.fromJson(r.nodes.first.toJson());
+      expect(again.flow, 'xtls-rprx-vision');
+      expect(again.dedupeKey, r.nodes.first.dedupeKey);
+    });
+  });
+
   group('AutofixEngine', () {
     test('fills trojan sni and reality fingerprint', () {
       final nodes = [

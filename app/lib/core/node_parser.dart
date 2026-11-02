@@ -478,6 +478,7 @@ class NodeParser {
       fingerprint: p['fp'],
       publicKey: p['pbk'],
       shortId: p['sid'],
+      flow: p['flow'],
       source: NodeSource.unknown,
       rawUri: uri,
     );
@@ -674,6 +675,7 @@ class NodeParser {
           : null,
       shortId:
           tls['reality'] is Map ? tls['reality']['short_id']?.toString() : null,
+      flow: ob['flow']?.toString(),
       obfs: ob['obfs'] is Map ? ob['obfs']['type']?.toString() : null,
       obfsPassword:
           ob['obfs'] is Map ? ob['obfs']['password']?.toString() : null,

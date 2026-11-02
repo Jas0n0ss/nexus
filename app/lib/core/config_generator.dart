@@ -173,7 +173,12 @@ class ConfigGenerator {
     switch (n.protocol) {
       case Protocol.vless:
         ob['uuid'] = n.uuid;
-        if (n.security == Security.reality && n.transport == Transport.tcp) {
+        final flow = n.flow?.trim() ?? '';
+        if (flow.isNotEmpty) {
+          ob['flow'] = flow;
+        } else if (n.security == Security.reality &&
+            n.transport == Transport.tcp) {
+          // Sensible default for VLESS+REALITY over TCP.
           ob['flow'] = 'xtls-rprx-vision';
         }
         break;
